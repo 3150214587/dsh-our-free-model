@@ -43,6 +43,9 @@ function ChannelTools({ summary }) {
   const [nickname, setNickname] = React.useState('')
   const file = React.useRef()
   const generation = React.useRef(0)
+  const actionPending = React.useRef(false)
+  const mounted = React.useRef(true)
+  const [messageKind, setMessageKind] = React.useState('status')
   const reload = React.useCallback(async () => {
     const started = ++generation.current
     const [statuses, value, nextLock] = await Promise.all([
@@ -58,19 +61,31 @@ function ChannelTools({ summary }) {
   React.useEffect(() => {
     setStatus(undefined); setLock(undefined); setAccounts([]); setAccount(''); setNickname(''); setMessage('')
     let active = true
-    void reload().catch(error => { if (active) setMessage(error.message) })
-    return () => { active = false; generation.current++ }
+    mounted.current = true
+    void reload().catch(error => { if (active) { setMessage(error.message); setMessageKind('alert') } })
+    return () => { active = false; mounted.current = false; generation.current++ }
   }, [reload])
-  const run = async action => {
-    setBusy(true); setMessage('')
+  const run = async (action, successMessage = '已保存。') => {
+    if (actionPending.current) return
+    actionPending.current = true
+    setBusy(true); setMessage(''); setMessageKind('status')
     try {
       await action()
-      await reload()
+      if (!mounted.current) return
       window.dispatchEvent(new CustomEvent('ofm:channels'))
       summary.reload?.()
-      setMessage('已保存。')
-    } catch (error) { setMessage(error.message) }
-    finally { setBusy(false) }
+      try {
+        await reload()
+        if (mounted.current) setMessage(successMessage)
+      } catch (error) {
+        if (mounted.current) setMessage(successMessage + ' 状态刷新失败：' + error.message + '。可重新读取，无需重复提交。')
+      }
+    } catch (error) {
+      if (mounted.current) { setMessage(error.message); setMessageKind('alert') }
+    } finally {
+      actionPending.current = false
+      if (mounted.current) setBusy(false)
+    }
   }
   const backup = async () => {
     const value = await rpc('backup.export')
@@ -106,26 +121,44 @@ function ChannelTools({ summary }) {
       h('button', { className: 'ofm_btn', disabled: !account || busy, onClick: () => run(() => rpc('account.reorder', { provider, orderedIds: [account, ...accounts.filter(row => row.id !== account).map(row => row.id)] })) }, '优先使用'),
       h('button', { className: 'ofm_btn', disabled: !account || busy, onClick: () => run(() => rpc('account.reset', { accountId: account })) }, '重置限流标记')),
     h('div', { className: 'ofm_row ofm_acts' },
-      h('button', { className: 'ofm_btn', disabled: busy, onClick: () => run(backup) }, '导出账号备份'),
+      h('button', { className: 'ofm_btn', disabled: busy, onClick: () => run(backup, '备份已生成，请在下载列表中查看。') }, '导出账号备份'),
       h('button', { className: 'ofm_btn', disabled: busy, onClick: () => file.current.click() }, '导入账号备份'),
       h('input', { ref: file, type: 'file', hidden: true, accept: '.json,application/json', onChange: importFile })),
     h('p', { className: 'ofm_note' }, '备份包含登录凭据，请保存在可信的本地位置。插件导出的原格式备份也可以手动导入。'),
-    message ? h('p', { role: 'status', className: 'ofm_note' }, message) : null)
+    message ? h('div', { className: 'channel-tools-feedback' },
+      h('p', { role: messageKind, className: 'ofm_note' }, message),
+      h('button', { className: 'ofm_btn', disabled: busy, onClick: () => {
+        setBusy(true)
+        void reload().then(() => { if (mounted.current) { setMessage('状态已更新。'); setMessageKind('status') } })
+          .catch(error => { if (mounted.current) { setMessage(error.message); setMessageKind('alert') } })
+          .finally(() => { if (mounted.current) setBusy(false) })
+      } }, '重新读取状态')) : null)
 }
 
 function ChannelConsole({ summary }) {
   const [page, setPage] = React.useState('accounts')
   return h(React.Fragment, null,
     h('header', { className: 'dashboard-heading' },
-      h('div', null, h('div', { className: 'heading-eyebrow' }, 'WORKSPACE / CHANNELS'),
+      h('div', null,
         h('h1', null, '免费账号渠道'), h('p', null, '连接你的账号，把各家的免费额度汇集到一个 API。'))),
     h('div', { className: 'ofm_seg', role: 'tablist', 'aria-label': '渠道管理页面' },
       [['accounts', '登录与账号池'], ['ledger', '渠道用量'], ['logs', '请求日志'], ['tools', '供应商与备份']].map(([id, name]) =>
-        h('button', { key: id, role: 'tab', 'aria-selected': page === id, onClick: () => setPage(id) }, name))),
-    page === 'accounts' ? h(ChannelBrowser, { rpc, summary })
-      : page === 'ledger' ? h(LedgerPage, { t, ctx, summary })
-        : page === 'logs' ? h(LogsPage, { t, ctx, summary })
-          : h(ChannelTools, { summary }))
+        h('button', { key: id, id: 'channels-tab-' + id, role: 'tab', 'aria-selected': page === id,
+          'aria-controls': 'channels-panel-' + id, tabIndex: page === id ? 0 : -1, onClick: () => setPage(id),
+          onKeyDown: event => {
+            const ids = ['accounts', 'ledger', 'logs', 'tools']
+            const current = ids.indexOf(id)
+            const next = event.key === 'ArrowRight' ? (current + 1) % ids.length : event.key === 'ArrowLeft' ? (current + ids.length - 1) % ids.length
+              : event.key === 'Home' ? 0 : event.key === 'End' ? ids.length - 1 : -1
+            if (next < 0) return
+            event.preventDefault(); setPage(ids[next])
+            requestAnimationFrame(() => document.getElementById('channels-tab-' + ids[next])?.focus())
+          } }, name))),
+    h('section', { role: 'tabpanel', id: 'channels-panel-' + page, 'aria-labelledby': 'channels-tab-' + page, tabIndex: 0 },
+      page === 'accounts' ? h(ChannelBrowser, { rpc, summary })
+        : page === 'ledger' ? h(LedgerPage, { t, ctx, summary })
+          : page === 'logs' ? h(LogsPage, { t, ctx, summary })
+            : h(ChannelTools, { summary })))
 }
 
 function EacPage({ summary }) {
@@ -136,12 +169,12 @@ function EacPage({ summary }) {
   React.useEffect(() => { login.refresh() }, [login.refresh])
   return h(React.Fragment, null,
     h('header', { className: 'dashboard-heading' },
-      h('div', null, h('div', { className: 'heading-eyebrow' }, 'WORKSPACE / EAC'),
+      h('div', null,
         h('h1', null, 'EAC 协付渠道'), h('p', null, '使用本机独立授权，连接共享资源池。'))),
     h(EacAuth, { t, auth, eacLogin: login }),
     h('div', { className: 'ofm_hero' },
       h('h3', null, 'EAC 实时资源池'),
-      pool == null ? h('p', null, pool === undefined ? '正在查询资源池…' : '资源池暂时无法查询，请稍后刷新。')
+      pool == null ? h('p', { role: pool === undefined ? 'status' : 'alert' }, pool === undefined ? '正在查询资源池…' : '资源池暂时无法查询，请稍后刷新。')
         : h(React.Fragment, null,
           h(Tank, { pct: reading.pct, level: reading.level, size: 'xl' }),
           h('p', null, `当前并发：${pool.inflight} · 24 小时活跃：${reading.active ?? '未知'} · 容量：${pool.pool ?? '未知'}`),

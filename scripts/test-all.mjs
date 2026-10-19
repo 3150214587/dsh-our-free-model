@@ -39,6 +39,8 @@ const suites = [
   ['release-preparation', 'release-preparation-test.mjs', []],
   ['client-lint', 'client-lint.mjs', []],
   ['sponsor', 'sponsor-test.mjs', []],
+  ['settings-draft-merge', 'settings-draft-merge-test.mjs', []],
+  ['frontend-interaction', 'frontend-interaction-test.mjs', []],
   ['heatmap', 'heatmap-test.mjs', []],
   ['trust', 'trust-test.mjs', []],
   ['sanitize', 'sanitize-test.mjs', []],

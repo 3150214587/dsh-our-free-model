@@ -107,10 +107,12 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
   }
 
   const cancel = () => {
+    const cancelled = operation
     pending.current?.abort()
     pending.current = undefined
     setOperation(undefined)
-    setTest(previous => previous ? { ...previous, state: 'cancelled' } : previous)
+    setTest(previous => previous?.state === 'pending' ? { ...previous, state: 'cancelled' } : previous)
+    setMessage(cancelled === 'probe' ? '已取消可用性探测' : cancelled === 'refresh' ? '已取消清单刷新' : '已取消模型测试')
   }
 
   const copyModelId = (model: Model) => {
@@ -143,9 +145,10 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
   const routable = summary.catalog.filter(model => model.routable).length
   return <div className="model-browser" data-testid="models-ready">
     <header className="dashboard-heading">
-      <div><div className="heading-eyebrow">WORKSPACE / MODELS</div><h1>模型清单</h1>
+      <div><h1>模型清单</h1>
         <p>{number(summary.catalog.length)} 个模型 · {number(routable)} 个可接入</p></div>
-      <div className="actions">
+      <div className="actions" aria-label="模型清单操作" aria-busy={!!operation}>
+        {operation && operation !== 'test' && <Button variant="outline" onClick={cancel}><Square size={14} />取消{operation === 'probe' ? '探测' : '刷新'}</Button>}
         <Button variant="outline" disabled={!!operation} onClick={() => { void run('refresh') }}>
           <RefreshCw size={15} className={operation === 'refresh' ? 'spinning' : ''} />{operation === 'refresh' ? '正在刷新' : '刷新清单'}
         </Button>
@@ -164,6 +167,8 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
     {error && <div className="channel-error" role="alert"><CircleAlert size={16} /><span>{error}</span>
       <Button variant="ghost" aria-label="关闭错误提示" title="关闭错误提示" onClick={() => setError('')}><X size={15} /></Button></div>}
     {message && <p className="model-feedback" role="status"><Check size={15} />{message}</p>}
+    <section className="model-view-controls" aria-label="当前列表筛选">
+      <div className="model-control-heading"><h2>查找模型</h2><p>筛选只影响当前列表。</p></div>
     <div className="model-filters">
       <div className="model-search"><Search size={16} /><Input type="search" aria-label="搜索模型" placeholder="搜索模型名称或 ID…"
         value={filters.search} onChange={event => changeFilters({ search: event.target.value })} /></div>
@@ -185,12 +190,17 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
       <span role="status" data-testid="model-result-count">{number(models.length)} / {number(summary.catalog.length)} 个模型</span>
       {filtered && <Button variant="ghost" onClick={() => changeFilters(initialFilters)}><X size={14} />清空筛选</Button>}
     </div>
-    <div className="model-list-toolbar">
+    </section>
+    <section className="model-publication-settings" aria-label="客户端模型展示" aria-busy={visibilitySaving}>
+      <div className="model-control-heading"><h2>客户端模型展示</h2><p>以下开关立即保存，会同步影响客户端和 API 模型清单；历史模型 ID 仍可调用。</p></div>
+      <div className="model-publication-actions">
       <label><input type="checkbox" role="switch" checked={summary.settings.hideFreeModels === true}
         disabled={visibilitySaving} onChange={event => { void saveVisibility({ hideFreeModels: event.target.checked }) }} /> {visibility.hideFree}</label>
       <label><input type="checkbox" role="switch" checked={summary.settings.hideEacModels === true}
         disabled={visibilitySaving} onChange={event => { void saveVisibility({ hideEacModels: event.target.checked }) }} /> {visibility.hideEac}</label>
-    </div>
+      {visibilitySaving && <span role="status" className="model-publication-state"><LoaderCircle size={14} className="spinning" />正在保存</span>}
+      </div>
+    </section>
     {test && <section className={`model-test-result model-test-${test.state}`} aria-label="模型测试结果" aria-live="polite">
       <div className="model-test-heading"><div><strong>
         {test.state === 'pending' ? '正在测试' : test.state === 'success' ? '测试完成' : test.state === 'cancelled' ? '测试已取消' : '测试失败'}

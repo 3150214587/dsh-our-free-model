@@ -6,7 +6,7 @@ const readText = file => fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n')
 const source = readText(new URL('src/sponsor.js', root)).replace(/^export /gm, '')
 const css = readText(new URL('src/sponsor.css', root))
 const image = fs.readFileSync(new URL('docs/images/sponsor-beichen-examples.jpg', root)).toString('base64')
-const block = `    // BEGIN GENERATED SPONSOR\n${source}\n    const SPONSOR_CSS = ${JSON.stringify(css)}\n    const SPONSOR_IMAGE = 'data:image/jpeg;base64,${image}'\n    const { SponsorPage, SponsorNotice } = createSponsorUI(React, SPONSOR_IMAGE, ReactDOM.createPortal)\n    // END GENERATED SPONSOR`
+const block = `    // BEGIN GENERATED SPONSOR\n${source}\n    const SPONSOR_CSS = ${JSON.stringify(css)}\n    const SPONSOR_IMAGE = 'data:image/jpeg;base64,${image}'\n    const { SponsorPage, SponsorBanner } = createSponsorUI(React, SPONSOR_IMAGE)\n    // END GENERATED SPONSOR`
 const file = new URL('client.js', root)
 const old = readText(file)
 const next = old.replace(/    \/\/ BEGIN GENERATED SPONSOR[\s\S]*?    \/\/ END GENERATED SPONSOR/, block)

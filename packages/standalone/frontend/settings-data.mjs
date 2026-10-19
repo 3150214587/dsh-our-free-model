@@ -23,8 +23,22 @@ export function settingsChanged(draft, saved) {
  * @param {{ saved: import('./types').ServiceSettings, draft: ReturnType<typeof settingsDraft> }} state
  * @param {import('./types').ServiceSettings} saved
  * @param {boolean} saving */
-export function syncSettings(state, saved, saving) {
-  return { saved, draft: saving || settingsChanged(state.draft, state.saved) ? state.draft : settingsDraft(saved) }
+export function syncSettings(state, saved, saving, editedFields) {
+  if (saving) return { saved, draft: state.draft }
+  // 旧调用保留原有草稿契约；交互表单传入明确编辑过的字段后逐字段合并。
+  if (!editedFields) return { saved, draft: settingsChanged(state.draft, state.saved) ? state.draft : settingsDraft(saved) }
+  const incoming = settingsDraft(saved)
+  const draft = { ...incoming }
+  for (const key of Object.keys(incoming)) if (editedFields.has(key)) draft[key] = state.draft[key]
+  return { saved, draft }
+}
+
+/** 只提交明确编辑且与最新保存值不同的字段，不携带其他页面拥有的设置。 */
+export function changedSettingsPatch(draft, saved, editedFields) {
+  const validation = validateSettingsDraft(draft)
+  if (!validation.patch) return validation
+  return { errors: validation.errors, patch: Object.fromEntries(Object.entries(validation.patch)
+    .filter(([key, value]) => (!editedFields || editedFields.has(key)) && value !== saved[key])) }
 }
 
 /** Only form-owned settings are submitted; preserve per-model choices made elsewhere.
