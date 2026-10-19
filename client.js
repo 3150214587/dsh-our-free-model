@@ -37,7 +37,6 @@ const SPONSOR = Object.freeze({
   name: '北辰API',
   url: 'https://beichenapi.com/register?aff=DL49WAC2DQNG',
   invite: 'DL49WAC2DQNG',
-  group: '908370050',
   greeting: '非常抱歉，亲爱的朋友：',
   paragraphs: [
     '为了租上服务器(超级贵，我们几个穷学生...)，让我们的插件正常使用，我们不得不找甲方接一点广告和挣一点佣金。非常抱歉，这都是为了提高服务器并发量和号池(100%是为了提升体验和维护运营)(突然爆火了，我们的小服务器直接炸，只好花钱换)，属实是无奈之举。若广告带来了不好的体验，还望体谅。',
@@ -5780,9 +5779,11 @@ function createSponsorUI(React, image, variant = 'plugin') {
         h('div', { className: 'ofm_tabs', role: 'tablist', 'aria-label': t('nav'), 'aria-orientation': 'horizontal', ref: railRef, onKeyDown: onTabKey }, tabNodes),
         h('span', { className: 'ofm_navspacer' }),
         h(StarButton, { t }))
+
       const renderPage = id => { if (id === 'sponsor') return h(SponsorPage); if (id === 'channels') return h(ChannelsPage, { t, ctx, summary }); if (id === 'aggregate') return h(AggregatePage, { t, summary }); if (id === 'saver') return h(SaverPage, { t }); if (id === 'routing') return h(RoutingPage, { t }); if (id === 'ledger') return h(LedgerPage, { t, ctx }); if (id === 'logs') return h(LogsPage, { t, ctx }); if (id === 'gateway') return h(GatewayPage, { t, ctx }); if (id === 'upgrade') return h(UpgradePage, { t, settings: data.settings, onApply: apply, busy }); if (id === 'picks') return h(PicksPage, { t }); const common = { t, data, counts, summary, stats, eacAuth, setEacAuth, eacLogin, busy, catalogBusy, apply, bench, benches, refresh, reprobe }; return id === 'eac' ? h(EacPage, common) : h(FreePage, common) }
       const panels = [tab, ...['free', 'aggregate', 'routing'].filter(id => id !== tab && visited.includes(id))]
       return h('div', { className: 'ofm_root ofm_shell' }, nav, h(SponsorBanner, { onDetails: () => navigate('sponsor', true), detailsActive: tab === 'sponsor' }), panels.map(id => h('div', { key: id, id: 'ofm-panel-' + id, role: 'tabpanel', 'aria-labelledby': tabId(id), className: 'ofm_tabpanel', hidden: id !== tab, tabIndex: 0, ref: node => { panelRefs.current[id] = node } }, renderPage(id))))
+
     }
 
     function FreePage(props) {

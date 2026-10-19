@@ -4,7 +4,6 @@ export const SPONSOR = Object.freeze({
   name: '北辰API',
   url: 'https://beichenapi.com/register?aff=DL49WAC2DQNG',
   invite: 'DL49WAC2DQNG',
-  group: '908370050',
   greeting: '非常抱歉，亲爱的朋友：',
   paragraphs: [
     '为了租上服务器(超级贵，我们几个穷学生...)，让我们的插件正常使用，我们不得不找甲方接一点广告和挣一点佣金。非常抱歉，这都是为了提高服务器并发量和号池(100%是为了提升体验和维护运营)(突然爆火了，我们的小服务器直接炸，只好花钱换)，属实是无奈之举。若广告带来了不好的体验，还望体谅。',
