@@ -1,7 +1,7 @@
 {
   "version": "2.5.7",
   "base": "../",
-  "publishedAt": "2026-10-20T14:04:58.042Z",
+  "publishedAt": "2026-10-20T15:47:00.755Z",
   "notes": "",
   "files": [
     {
@@ -71,8 +71,8 @@
     },
     {
       "path": "src/catalog.js",
-      "size": 28564,
-      "sha256": "468e1caaf36bb19ad3764ac9a59710bb22d04e02cb778ae6047929fe20400286"
+      "size": 28705,
+      "sha256": "73a17a114fa1f9ff000503ff8af25e591e3cd4a98c93921e3f5472461e48eaab"
     },
     {
       "path": "src/chan-relay.js",
@@ -405,5 +405,5 @@
       "sha256": "6419471effa631519def7797d76d7ede38b9fcfa9a83c2148c8ef5d43355b43d"
     }
   ],
-  "signature": "axJqiXA3w2glf/qREAqkLYCHhfzy0hub6MeJYRFMX+NvaOJV1UZQa/5M+H0/S+O+OaVfzqJ4mq4gaM3oH+ywAQ=="
+  "signature": "4Ept34JGCUnR/emUBnzwctgp6uXAbEJEg60b1vgDHH1YAZ4y+SS+0/z0k0xOI2ZoFGle35bPriQasdGnD4HeBw=="
 }

@@ -69,8 +69,8 @@
     },
     {
       "path": "src/catalog.js",
-      "size": 28564,
-      "sha256": "468e1caaf36bb19ad3764ac9a59710bb22d04e02cb778ae6047929fe20400286"
+      "size": 28705,
+      "sha256": "73a17a114fa1f9ff000503ff8af25e591e3cd4a98c93921e3f5472461e48eaab"
     },
     {
       "path": "src/chan-relay.js",
