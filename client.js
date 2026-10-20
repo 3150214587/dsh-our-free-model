@@ -248,9 +248,6 @@ window.__ModuleLoader__.load({
         'pref.egress': '当前出口',
         'pref.probedAt': '最近探测',
         'pref.measuredAt': '最近测量',
-        'pref.lowPerformance': '低性能模式',
-        'pref.lowPerformanceHint': '立即减少 OFM 的模糊、滤镜和装饰动画，保留加载提示；仅影响 OFM。浏览器允许本机存储时，刷新后保留。',
-        'pref.lowPerformanceSession': '浏览器存储不可用，本次选择仅对当前页面生效。',
         'bench.run': '测一次',
         'bench.running': '测量中…',
         'bench.notSaved': '结果未能保存，请检查数据目录；刷新后可能丢失。',
@@ -946,9 +943,6 @@ window.__ModuleLoader__.load({
         'pref.egress': 'Current egress',
         'pref.probedAt': 'Last probe',
         'pref.measuredAt': 'Last measurement',
-        'pref.lowPerformance': 'Low performance mode',
-        'pref.lowPerformanceHint': 'Reduce OFM blur, filters and decorative motion immediately; loading indicators remain. Affects only OFM. Retained after refresh when browser storage is available.',
-        'pref.lowPerformanceSession': 'Browser storage is unavailable. This choice applies only to the current page.',
         'bench.run': 'Run once',
         'bench.running': 'Measuring…',
         'bench.notSaved': 'The result could not be saved. Check the data directory; it may be lost after refresh.',
@@ -2374,104 +2368,7 @@ window.__ModuleLoader__.load({
 .ofm_reconote{margin:0;font-size:11px;line-height:1.6;color:var(--dsw-alias-label-tertiary)}
 @media (max-width:600px){.ofm_recogrid{grid-template-columns:1fr}.ofm_recoacts{width:100%;margin-left:0}}
 @media (prefers-reduced-motion:reduce){.ofm_recocard,.ofm_recostar,.ofm_recogo,.ofm_recochip,.ofm_recomark{animation:none;transition:border-color .12s ease,background .12s ease,box-shadow .12s ease,opacity .12s ease,color .12s ease}.ofm_recocard:hover,.ofm_recostar:hover,.ofm_recostar:active,.ofm_recogo:hover,.ofm_recochip:hover,.ofm_recocard:hover .ofm_recomark{transform:none}.ofm_recostar::after,.ofm_recostarring,.ofm_recoglow{display:none}}
-/* Only marked OFM surfaces participate; unrelated host/plugin animations remain intact. */
-.ofm_uiprefs{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px}
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"],
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] *,
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"]::before,
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"]::after,
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] *::before,
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] *::after{
-  filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
-  animation:none!important;transition:none!important;will-change:auto!important
-}
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] .ofm_aurora,
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] .ofm_recoglow,
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] .ofm_recostarring,
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] .ofm_tankrays,
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] .ofm_wave,
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] .ofm_bubble,
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] .ofm_fish{display:none!important}
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"].ofm_root::before{display:none!important}
-/* Busy is functional feedback: retain a cheap moving bar/spinner and visible skeletons. */
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] .ofm_prog i{animation:ofm-prog-slide 1.1s ease-in-out infinite!important}
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] .ofm_btn[aria-busy="true"]::after{animation:ofm-btn-spin 1s linear infinite!important}
-:is(.ofm_root,.ofm_toasts,[data-ofm-announcement-root],.ofm_scrim[data-ofm-urgent])[data-ofm-low-performance="true"] .ofm_skel{opacity:1!important}
 `
-
-    // This browser-only preference never writes backend settings. Each root is
-    // owned by OFM, including the body-level portals; the host has no marker.
-    const LOW_PERFORMANCE_KEY = 'ofm.ui.low-performance.v1'
-    const UI_ROOTS = '.ofm_root, .ofm_toasts, [data-ofm-announcement-root], .ofm_scrim[data-ofm-urgent]'
-    let lowPerformance
-    let uiStorageAvailable = true
-    function isLowPerformance() {
-      if (lowPerformance === undefined) {
-        try {
-          const storage = window.localStorage
-          lowPerformance = storage?.getItem(LOW_PERFORMANCE_KEY) === 'true'
-          uiStorageAvailable = storage !== undefined && storage !== null
-        } catch { lowPerformance = false; uiStorageAvailable = false }
-      }
-      return lowPerformance
-    }
-    function uiRoot(node) {
-      node?.setAttribute('data-ofm-low-performance', String(isLowPerformance()))
-      return node
-    }
-    function syncUiRoots() {
-      for (const node of document.querySelectorAll(UI_ROOTS)) uiRoot(node)
-    }
-    function setLowPerformance(value) {
-      lowPerformance = value === true
-      try {
-        const storage = window.localStorage
-        uiStorageAvailable = storage !== undefined && storage !== null
-        storage?.setItem(LOW_PERFORMANCE_KEY, String(lowPerformance))
-      } catch { uiStorageAvailable = false }
-      syncUiRoots()
-      const detail = { lowPerformance, storageAvailable: uiStorageAvailable }
-      window.dispatchEvent(new CustomEvent('ofm:ui-preferences', { detail }))
-      return detail
-    }
-    // The standalone/legacy client can share this document. Consume the new
-    // value in memory, including when storage is denied, without echoing events.
-    function receiveUiPreference(event) {
-      if (event?.type === 'storage') {
-        try { if (event.storageArea != null && event.storageArea !== window.localStorage) return false } catch { return false }
-        if (event.key !== LOW_PERFORMANCE_KEY && event.key !== null) return false
-        lowPerformance = event.newValue === 'true'
-        uiStorageAvailable = true
-      } else if (event?.type === 'ofm:ui-preferences') {
-        if (typeof event.detail?.lowPerformance !== 'boolean' || typeof event.detail?.storageAvailable !== 'boolean') return false
-        lowPerformance = event.detail.lowPerformance
-        uiStorageAvailable = event.detail.storageAvailable
-      }
-      syncUiRoots()
-      return true
-    }
-    function useLowPerformance() {
-      const snapshot = () => ({ lowPerformance: isLowPerformance(), storageAvailable: uiStorageAvailable })
-      const [state, setState] = useState(snapshot)
-      useEffect(() => {
-        const sync = event => { if (receiveUiPreference(event)) setState(snapshot()) }
-        window.addEventListener('ofm:ui-preferences', sync)
-        window.addEventListener('storage', sync)
-        setState(snapshot())
-        return () => {
-          window.removeEventListener('ofm:ui-preferences', sync)
-          window.removeEventListener('storage', sync)
-        }
-      }, [])
-      return [state.lowPerformance, setLowPerformance, state.storageAvailable]
-    }
-    function LowPerformancePreference({ t }) {
-      const [enabled, setEnabled, storageAvailable] = useLowPerformance()
-      return h('div', { className: 'ofm_uiprefs' },
-        h(Switch, { checked: enabled, label: t('pref.lowPerformance'), title: t('pref.lowPerformanceHint'), onChange: () => setEnabled(!enabled) }),
-        h('span', { className: 'ofm_note' }, t('pref.lowPerformanceHint')),
-        storageAvailable ? null : h('span', { className: 'ofm_note', role: 'status' }, t('pref.lowPerformanceSession')))
-    }
 
     // ── helpers ───────────────────────────────────────────────────────────────
     // 用页面 base 解析，而不是 origin-absolute 的「/api/...」：DSH 挂在反向代理
@@ -2745,7 +2642,7 @@ window.__ModuleLoader__.load({
         host.className = 'ofm_toasts'
         document.body.appendChild(host)
       }
-      return uiRoot(host)
+      return host
     }
 
     function showToast({ title, body, html, tone, actions = [], holdMs = 10000 }) {
@@ -2810,7 +2707,6 @@ window.__ModuleLoader__.load({
         const scrim = document.createElement('div')
         scrim.className = 'ofm_scrim'
         scrim.setAttribute('data-ofm-urgent', 'true')
-        uiRoot(scrim)
         const modal = document.createElement('div')
         modal.className = 'ofm_modal'
         modal.setAttribute('role', 'alertdialog')
@@ -2856,7 +2752,6 @@ window.__ModuleLoader__.load({
       // those call sites meant.
       disabled: props.disabled === true,
       onClick: props.onChange,
-      title: props.title,
     }, h('i'), props.label === undefined ? null : h('span', null, props.label))
 
     const Pill = (props) => h('span', { className: `ofm_pill${props.strong ? ' strong' : ''}` },
@@ -4040,12 +3935,11 @@ window.__ModuleLoader__.load({
      */
     function useCountUp(target) {
       const [value, setValue] = useState(target ?? null)
-      const [lowPerformance] = useLowPerformance()
       useEffect(() => {
         if (typeof target !== 'number') return
         const reduced = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
           && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        if (reduced || lowPerformance) { setValue(target); return }
+        if (reduced) { setValue(target); return }
         const started = Date.now()
         let raf = 0
         const tick = () => {
@@ -4055,7 +3949,7 @@ window.__ModuleLoader__.load({
         }
         raf = requestAnimationFrame(tick)
         return () => cancelAnimationFrame(raf)
-      }, [target, lowPerformance])
+      }, [target])
       return value
     }
 
@@ -6293,9 +6187,9 @@ window.__ModuleLoader__.load({
         }
       }
 
-      if (summary.status === 'loading' && summary.data === undefined) return h('div', { className: 'ofm_root', ref: uiRoot }, h('p', { className: 'ofm_note' }, t('loading')))
+      if (summary.status === 'loading' && summary.data === undefined) return h('div', { className: 'ofm_root' }, h('p', { className: 'ofm_note' }, t('loading')))
       if (summary.status === 'error') {
-        return h('div', { className: 'ofm_root', ref: uiRoot },
+        return h('div', { className: 'ofm_root' },
           h('div', { className: 'ofm_callout ofm_error' }, h('div', null, h('b', null, t('loadFailed')), h('div', null, summary.error))),
           h('div', null, h(Button, { onClick: () => summary.reload() }, t('retry'))))
       }
@@ -6413,10 +6307,9 @@ window.__ModuleLoader__.load({
                       ? h(EacPage, { t, data, counts, summary, stats, eacAuth, setEacAuth, eacLogin, busy, catalogBusy, apply, bench, benches, refresh, reprobe })
                       : h(FreePage, { t, data, counts, summary, stats, eacAuth, eacLogin, busy, catalogBusy, apply, bench, benches, refresh, reprobe })
 
-      return h('div', { className: 'ofm_root ofm_shell', ref: uiRoot },
+      return h('div', { className: 'ofm_root ofm_shell' },
         h('div', { className: 'ofm_aurora', 'aria-hidden': 'true' }, h('i'), h('i'), h('i')),
         nav,
-        h(LowPerformancePreference, { t }),
         page)
     }
 
@@ -6560,7 +6453,7 @@ window.__ModuleLoader__.load({
         host.setAttribute('data-ofm-announcement-root', 'true')
         document.body.appendChild(host)
       }
-      return uiRoot(host)
+      return host
     }
 
     function Announcement(props) {
@@ -6656,17 +6549,6 @@ window.__ModuleLoader__.load({
         document.head.appendChild(style)
         return () => style.remove()
       }, 'our-free-model: styles')
-
-      ctx.effect(() => {
-        const sync = event => { receiveUiPreference(event) }
-        sync()
-        window.addEventListener('storage', sync)
-        window.addEventListener('ofm:ui-preferences', sync)
-        return () => {
-          window.removeEventListener('storage', sync)
-          window.removeEventListener('ofm:ui-preferences', sync)
-        }
-      }, 'our-free-model: UI preferences')
 
       // ── push subscription ───────────────────────────────────────────────────
       // One EventSource for the whole app surface: new announcements become

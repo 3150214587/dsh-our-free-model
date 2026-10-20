@@ -117,7 +117,7 @@ const suites = [
   ['model-test-probe-race', 'model-test-probe-race-test.mjs', []],
   ['model-test-finish-integration', 'model-test-finish-integration-test.mjs', []],
   ['bench-integration', 'bench-integration-test.mjs', []],
-  ['plugin-ui-preferences', 'plugin-ui-preferences-test.mjs', []],
+  ['plugin-bench-ui', 'plugin-bench-ui-test.mjs', []],
   ['standalone-ui-preferences', 'standalone-ui-preferences-test.mjs', []],
   ['codearts-direct-fetch', 'codearts-direct-fetch-test.mjs', []],
   ['gateway-source', 'gateway-source-test.mjs', []],
