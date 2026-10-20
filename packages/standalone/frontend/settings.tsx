@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
 import { CircleAlert, Check, LoaderCircle, RotateCcw, Save, Settings2, RefreshCw } from 'lucide-react'
 import { Badge, Button, Card, Input } from './components/ui'
-import { settingsDraft, settingsChanged, syncSettings, changedSettingsPatch } from './settings-data.mjs'
+import { settingsDraft, settingsChanged, syncSettings, validateSettingsDraft } from './settings-data.mjs'
 import { visibilityCopy } from './visibility-data.mjs'
 import type { Host, Summary } from './types'
+import { getUiPreferences } from './ui-preferences.mjs'
 import './settings.css'
+
+const uiPreferences = getUiPreferences()
 
 type Draft = ReturnType<typeof settingsDraft>
 type NumberField = 'defaultMaxTokens' | 'probeIntervalMinutes'
@@ -15,6 +18,7 @@ const connectionError = (reason: unknown) => reason instanceof Error
     : reason.message : '保存失败，修改已保留，请重试。'
 
 export function Settings({ summary, host, active }: { summary: Summary; host: Host; active: boolean }) {
+  const ui = useSyncExternalStore(uiPreferences.subscribe, uiPreferences.getSnapshot)
   const visibility = visibilityCopy(document.documentElement.lang)
   const [state, setState] = useState(() => ({ saved: summary.settings, draft: settingsDraft(summary.settings) }))
   const [saving, setSaving] = useState(false)
@@ -22,7 +26,6 @@ export function Settings({ summary, host, active }: { summary: Summary; host: Ho
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const savingRef = useRef(false)
-  const editedFields = useRef(new Set<string>())
   const mounted = useRef(true)
   const activeRef = useRef(active)
   const generation = useRef(0)
@@ -32,40 +35,20 @@ export function Settings({ summary, host, active }: { summary: Summary; host: Ho
     if (!active) { generation.current++; setMessage(''); setError('') }
   }, [active])
   useEffect(() => {
-    setState(previous => syncSettings(previous, summary.settings, savingRef.current, editedFields.current))
+    setState(previous => syncSettings(previous, summary.settings, savingRef.current))
   }, [summary.settings])
   const dirty = settingsChanged(state.draft, state.saved)
-  useEffect(() => {
-    if (!dirty) return
-    const protectDraft = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
-    window.addEventListener('beforeunload', protectDraft)
-    return () => window.removeEventListener('beforeunload', protectDraft)
-  }, [dirty])
   const update = <K extends keyof Draft>(key: K, value: Draft[K]) => {
-    setState(previous => {
-      if (value === settingsDraft(previous.saved)[key]) editedFields.current.delete(key)
-      else editedFields.current.add(key)
-      return { ...previous, draft: { ...previous.draft, [key]: value } }
-    })
+    setState(previous => ({ ...previous, draft: { ...previous.draft, [key]: value } }))
     setErrors(previous => ({ ...previous, [key]: undefined }))
     setMessage(''); setError('')
   }
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (savingRef.current || !activeRef.current) return
-    const validation = changedSettingsPatch(state.draft, state.saved, editedFields.current)
+    const validation = validateSettingsDraft(state.draft)
     setErrors(validation.errors); setMessage(''); setError('')
-    if (!validation.patch) {
-      const field = Object.keys(validation.errors)[0]
-      window.requestAnimationFrame(() => document.getElementById(`setting-${field}`)?.focus())
-      return
-    }
-    if (!Object.keys(validation.patch).length) {
-      editedFields.current.clear()
-      setState(previous => ({ ...previous, draft: settingsDraft(previous.saved) }))
-      setMessage('当前设置已同步')
-      return
-    }
+    if (!validation.patch) return
     const started = ++generation.current
     const feedbackCurrent = () => mounted.current && activeRef.current && started === generation.current
     savingRef.current = true
@@ -73,7 +56,6 @@ export function Settings({ summary, host, active }: { summary: Summary; host: Ho
     try {
       const saved = await host.saveSettings(validation.patch)
       if (!mounted.current) return
-      editedFields.current.clear()
       setState({ saved, draft: settingsDraft(saved) })
       if (feedbackCurrent()) setMessage('设置已保存并生效')
       // 保存结果已确认；后续读取失败不能误报为保存失败。
@@ -106,11 +88,25 @@ export function Settings({ summary, host, active }: { summary: Summary; host: Ho
   if (!active) return null
   const statusClass = saving ? 'settings-status-saving' : dirty ? 'settings-status-dirty' : message ? 'settings-status-saved' : ''
   return <div className="settings-browser" data-testid="settings-ready">
-    <header className="dashboard-heading"><div>
-      <h1>服务设置</h1><p>调整推理与模型刷新。修改集中保存，切换页面会保留草稿。</p></div>
+    <header className="dashboard-heading"><div><div className="heading-eyebrow">MANAGEMENT / SETTINGS</div>
+      <h1>服务设置</h1><p>调整本机推理与模型刷新，保存后生效。</p></div>
       <Badge tone={summary.settings.enabled ? 'success' : 'warning'}>{summary.settings.enabled ? '推理服务已启用' : '推理服务已暂停'}</Badge>
     </header>
-    <form onSubmit={event => { void submit(event) }} noValidate aria-busy={saving}>
+    <fieldset className="settings-fieldset settings-ui-preferences" aria-labelledby="ui-preferences-title">
+      <Card className="settings-card">
+        <div className="settings-card-heading"><Settings2 size={16} /><div><h2 id="ui-preferences-title">界面性能</h2><p>仅影响当前浏览器或桌面窗口，切换后立即生效。</p></div></div>
+        <div className="settings-field">
+          <label htmlFor="setting-low-performance"><strong>低性能模式</strong><small id="setting-low-performance-help">关闭毛玻璃、模糊背景和装饰动效，保留明暗主题与加载提示。</small></label>
+          <input id="setting-low-performance" type="checkbox" role="switch" className="settings-toggle"
+            checked={ui.lowPerformance} aria-describedby="setting-low-performance-help setting-ui-preferences-status"
+            onChange={event => uiPreferences.setLowPerformance(event.target.checked)} />
+        </div>
+        <p id="setting-ui-preferences-status" className="footnote" role="status">{ui.storageAvailable
+          ? '已自动保存在当前浏览器，无需点击“保存设置”。'
+          : '浏览器存储不可用；本次打开仍可切换，关闭或刷新后可能无法保留。'}</p>
+      </Card>
+    </fieldset>
+    <form onSubmit={event => { void submit(event) }} noValidate>
       <fieldset disabled={saving} className="settings-fieldset">
         <Card className="settings-card"><div className="settings-card-heading"><Settings2 size={16} /><div><h2>推理与模型</h2><p>控制客户端调用与模型展示。</p></div></div>
           {toggle('enabled', '启用推理服务', '关闭后暂停 API 推理，管理页面仍可访问。')}
@@ -129,7 +125,6 @@ export function Settings({ summary, host, active }: { summary: Summary; host: Ho
         </Card>
         <div className="settings-footer"><span role="status" aria-live="polite" className={statusClass}><span className="settings-status-dot" aria-hidden="true" />{saving ? '正在保存，请稍候…' : dirty ? '有尚未保存的修改' : message || '当前设置已同步'}</span>
           <div className="settings-actions"><Button variant="outline" disabled={!dirty || saving} onClick={() => {
-            editedFields.current.clear()
             setState(previous => ({ ...previous, draft: settingsDraft(previous.saved) }))
             setErrors({}); setError(''); setMessage('')
           }}><RotateCcw size={15} />撤销修改</Button>

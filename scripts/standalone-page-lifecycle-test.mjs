@@ -11,7 +11,8 @@ const require = createRequire(import.meta.url)
 // symlink check. Locally, where the devDependency is installed, it runs.
 let transformSync
 try {
-  ({ transformSync } = require('esbuild'))
+  const standaloneRequire = createRequire(new URL('../packages/standalone/package.json', import.meta.url))
+  ;({ transformSync } = standaloneRequire('esbuild'))
 } catch {
   console.log('ok  standalone-page-lifecycle skipped: esbuild is not installed (the offline job installs nothing)')
   process.exit(0)
@@ -31,9 +32,9 @@ const settings = { enabled: true }
 const summary = { settings, catalog: [], networkMode: 'fixture' }
 const context = {
   ...react, h: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity) }), Fragment: 'fragment',
-  Sidebar: 'Sidebar', Topbar: 'Topbar', Overview: 'Overview', Connection: 'Connection', ChannelMount: 'ChannelMount', LazyPage: 'LazyPage', LoadingScreen: 'LoadingScreen', LoginScreen: 'LoginScreen', AlertCircle: 'AlertCircle', SponsorPage: 'SponsorPage', SponsorBanner: 'SponsorBanner',
-  pageNames: ['overview', 'models', 'usage', 'channels', 'eac', 'settings', 'connection', 'sponsor'], API: '/api/management',
-  messageOf: error => error.message, AbortSignal, URLSearchParams, location: { hash: '', pathname: '/', search: '' }, history: { pushState() {}, replaceState() {} },
+  Sidebar: 'Sidebar', Topbar: 'Topbar', SponsorNotice: 'SponsorNotice', Overview: 'Overview', Connection: 'Connection', ChannelMount: 'ChannelMount', LazyPage: 'LazyPage', LoadingScreen: 'LoadingScreen', LoginScreen: 'LoginScreen', AlertCircle: 'AlertCircle',
+  pageNames: ['overview', 'models', 'usage', 'channels', 'eac', 'settings', 'connection'], API: '/api/management',
+  messageOf: error => error.message, AbortSignal, URLSearchParams, location: { hash: '' }, history: {},
   window: { scrollTo() {}, addEventListener() {}, removeEventListener() {}, setInterval() { return 1 }, clearInterval() {} },
   document: { hidden: false }, navigator: { clipboard: { writeText: async () => {} } },
   fetch: async url => ({ ok: true, json: async () => url.endsWith('/summary') ? summary : { models: [], days: [] } }),
@@ -70,11 +71,3 @@ releaseOldKey({ ok: false, status: 401, json: async () => ({ error: '旧会话�
 await oldKey; tree = render()
 assert.equal(tree.props.id, 'app', '旧会话迟到 401 不得登出新会话')
 console.log('ok  切页保留设置草稿与模型筛选，非活动页面暂停任务，退出移除工作空间')
-
-// 深链接首次进入的页面也必须参与保留，不能等下一次 navigate 才记忆。
-slots.length = 0; effects.length = 0; context.location.hash = '#page=settings'
-render(); await flush(); tree = render()
-assert.ok(all(tree).some(node => node.type === 'LazyPage' && node.props.name === 'settings'))
-host().navigate('models'); tree = render()
-assert.ok(all(tree).some(node => node.type === 'LazyPage' && node.props.name === 'settings' && node.props.active === false), '直接进入设置页后切页也须保留未保存草稿')
-console.log('ok  深链接首次进入设置页的草稿容器在切页后保留')

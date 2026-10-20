@@ -17,11 +17,6 @@ export function ChannelBrowser({ rpc, summary }: { rpc: Rpc; summary: Summary & 
   const [selected, select] = useState<string>()
   const [auto, setAuto] = useState<{ enabled: boolean; running?: boolean; ranToday?: boolean }>()
   const [busy, setBusy] = useState(false)
-  const [autoReading, setAutoReading] = useState(true)
-  const [autoError, setAutoError] = useState('')
-  const autoSequence = useRef(0)
-  const autoPending = useRef(false)
-  const returnProvider = useRef<string | undefined>(undefined)
   const mounted = useRef(false)
   const sequence = useRef(0)
   const detailHeading = useRef<HTMLHeadingElement>(null)
@@ -36,38 +31,19 @@ export function ChannelBrowser({ rpc, summary }: { rpc: Rpc; summary: Summary & 
       if (mounted.current && started === sequence.current) setError((failure as Error).message)
     }
   }, [rpc])
-  const readAuto = useCallback(async () => {
-    if (autoPending.current) return
-    const started = ++autoSequence.current
-    autoPending.current = true
-    setAutoReading(true); setAutoError('')
-    try {
-      const value = await rpc('usage.autoCheckin', {})
-      if (!value.autoCheckin) throw new Error('服务没有返回签到状态，请重试。')
-      if (mounted.current && started === autoSequence.current) setAuto(value.autoCheckin)
-    } catch (failure) {
-      if (mounted.current && started === autoSequence.current) setAutoError(failure instanceof Error ? failure.message : '签到状态读取失败，请重试。')
-    } finally {
-      if (started === autoSequence.current) {
-        autoPending.current = false
-        if (mounted.current) setAutoReading(false)
-      }
-    }
-  }, [rpc])
   useEffect(() => {
     mounted.current = true
-    void reload(); void readAuto()
-    const timer = setInterval(() => { if (!document.hidden) void reload() }, 45000)
-    return () => { mounted.current = false; sequence.current++; autoSequence.current++; autoPending.current = false; clearInterval(timer) }
-  }, [rpc, reload, readAuto])
+    void reload()
+    void rpc('usage.autoCheckin', {}).then(value => {
+      if (mounted.current) setAuto(value.autoCheckin)
+    }).catch(() => {})
+    const timer = setInterval(() => { void reload() }, 45000)
+    return () => { mounted.current = false; sequence.current++; clearInterval(timer) }
+  }, [rpc, reload])
   useEffect(() => {
     if (selected) {
       window.scrollTo({ top: 0, behavior: 'instant' })
       detailHeading.current?.focus({ preventScroll: true })
-    } else if (returnProvider.current) {
-      const button = document.querySelector<HTMLButtonElement>('[data-provider-id="' + CSS.escape(returnProvider.current) + '"] .provider-manage')
-      button?.focus({ preventScroll: true })
-      returnProvider.current = undefined
     }
   }, [selected])
   const onChanged = useCallback(() => {
@@ -102,24 +78,22 @@ export function ChannelBrowser({ rpc, summary }: { rpc: Rpc; summary: Summary & 
       <div className="ch-metric"><span className="ch-metric-icon"><ShieldCheck size={16} /></span>
         <div className="ch-metric-body"><span className="ch-metric-label">本机账号</span>
           <strong className="ch-metric-value">{statuses ? accounts : <span className="ch-skeleton" />}</strong></div></div>
-      <div className="checkin-control" aria-busy={autoReading || busy}><span className={`status-dot ${!auto?.enabled || autoError ? 'paused' : ''}`} /><span>{autoReading ? '读取签到状态…' : autoError ? '签到状态未读取' : auto?.running ? '签到进行中' : auto?.ranToday ? '今日签到已执行' : auto?.enabled ? '每日自动签到' : '自动签到已关闭'}</span>
+      <div className="checkin-control"><span className="status-dot" /><span>{auto?.running ? '签到进行中' : auto?.ranToday ? '今日签到已执行' : '每日自动签到'}</span>
         <button type="button" role="switch" aria-label="每日自动签到" aria-checked={auto?.enabled === true}
-          className={`ui-switch ${auto?.enabled ? 'on' : ''}`} disabled={!auto || busy || autoReading || !!autoError} onClick={() => {
+          className={`ui-switch ${auto?.enabled ? 'on' : ''}`} disabled={!auto || busy} onClick={() => {
             setBusy(true)
             void rpc('usage.autoCheckin', { enabled: !auto?.enabled }).then(value => { if (mounted.current) setAuto(value.autoCheckin) })
-              .catch(failure => { if (mounted.current) setAutoError(failure.message) }).finally(() => { if (mounted.current) setBusy(false) })
+              .catch(failure => { if (mounted.current) setError(failure.message) }).finally(() => { if (mounted.current) setBusy(false) })
           }}><span /></button>
       </div>
     </div>
-    {autoError && <div className="channel-error checkin-error" role="alert"><CircleAlert size={16} /><span>签到状态：{autoError}</span><Button variant="outline" disabled={autoReading} onClick={() => { void readAuto() }}>重试签到状态</Button></div>}
     {error && <div className="channel-error" role="alert"><CircleAlert size={16} /><span>{error}</span><Button variant="ghost" onClick={() => { void reload() }}>重试</Button></div>}
     {selectedProvider ? <div className="provider-detail" data-testid="provider-detail">
       <div className="provider-detail-top"><Button variant="outline" onClick={() => select(undefined)}><ArrowLeft size={15} />返回全部渠道</Button>
         <span>账号凭据保存在本机独立目录</span></div>
       <div className="provider-detail-layout"><Card className="provider-detail-sidebar"><h2 tabIndex={-1} ref={detailHeading}>{selectedProvider.name}</h2><p>{selectedProvider.org}</p>
-        <label className="detail-provider-select">切换渠道<select aria-label="切换详情渠道" value={selected} onChange={event => select(event.target.value)}>{providers.map(provider => <option key={provider.id} value={provider.id}>{provider.name}</option>)}</select></label>
         <div className="detail-label">切换渠道</div>{providers.map(provider => <button className={`detail-provider-link ${provider.id === selected ? 'active' : ''}`} key={provider.id}
-          aria-pressed={provider.id === selected} onClick={() => select(provider.id)}><span>{provider.name}</span>{provider.id === selected && <Check size={14} />}</button>)}</Card>
+          onClick={() => select(provider.id)}><span>{provider.name}</span>{provider.id === selected && <Check size={14} />}</button>)}</Card>
         <div className="provider-detail-main"><div className="provider-detail-description"><h2>账号与模型</h2><p>添加账号，管理免费额度与可用模型。</p></div>
           <shared.ChannelCard key={selectedProvider.id} channel={selectedProvider} status={statuses?.[selectedProvider.id]} rpc={rpc} t={t} onChanged={onChanged} onError={onError} />
           <div className="detail-security-note"><ShieldCheck size={16} />沿用原渠道的登录、续期与额度规则。账号备份和供应商设置位于「供应商与备份」。</div>
@@ -132,14 +106,14 @@ export function ChannelBrowser({ rpc, summary }: { rpc: Rpc; summary: Summary & 
       <div className="channel-results-meta"><span>{rows.length} 个渠道</span><span><SlidersHorizontal size={13} />按供应商管理独立账号与额度</span></div>
       <div className="provider-grid">{rows.map(provider => {
         const status = statuses?.[provider.id]
-        const state = status === undefined ? error ? '读取失败' : '读取中' : status.closed ? '已关闭' : (status.accounts?.enabled ?? 0) > 0 ? '已接入' : '待接入'
-        return <Card className="provider-card" key={provider.id} data-provider-id={provider.id}>
+        const state = status === undefined ? '读取中' : status.closed ? '已关闭' : (status.accounts?.enabled ?? 0) > 0 ? '已接入' : '待接入'
+        return <Card className="provider-card" key={provider.id}>
           <div className="provider-card-top"><span className="provider-logo" style={{ color: provider.accent, backgroundColor: `${provider.accent}0d` }}>{provider.name.slice(0, 2).toUpperCase()}</span>
             <Badge tone={state === '已接入' ? 'success' : 'neutral'}>{state === '已接入' && <span className="status-dot" />}{state}</Badge></div>
           <h2>{provider.name}</h2><div className="provider-org">{provider.org}</div><p className="provider-description">{provider.note}</p>
           <div className="provider-counts"><span>账号 <strong>{status ? status.accounts?.total ?? 0 : '—'}</strong></span>
             <span>模型 <strong>{status ? Math.max(0, (status.models?.total ?? 0) - (status.models?.disabled ?? 0)) : '—'}</strong></span></div>
-          <Button variant="outline" className="provider-manage" onClick={() => { returnProvider.current = provider.id; select(provider.id) }}>管理渠道 <ArrowRight size={14} /></Button>
+          <Button variant="outline" className="provider-manage" onClick={() => select(provider.id)}>管理渠道 <ArrowRight size={14} /></Button>
         </Card>
       })}</div>
       {rows.length === 0 && <Card className="channel-empty"><Search size={24} /><h2>没有匹配的渠道</h2><p>试试其他名称，或切换筛选条件。</p><Button variant="outline" onClick={() => { setSearch(''); setFilter('all') }}>重置筛选</Button></Card>}

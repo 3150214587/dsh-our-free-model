@@ -13,7 +13,7 @@ export function Button({ className, variant = 'default', size, busy = false, asC
   React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: ButtonSize; busy?: boolean; asChild?: boolean }) {
   const Component = asChild ? Slot : 'button'
   return <Component type="button" className={cn('ui-button', `ui-button-${variant}`, size && `ui-button-${size}`, busy && 'is-busy', className)}
-    disabled={disabled || busy} data-busy={busy || undefined} aria-busy={busy || undefined} {...props}>
+    disabled={disabled || busy} data-busy={busy || undefined} {...props}>
     {busy && <Spinner className="ui-button-spinner" aria-hidden="true" />}{children}
   </Component>
 }
@@ -51,15 +51,11 @@ export function Kbd({ className, ...props }: React.HTMLAttributes<HTMLElement>) 
 }
 
 /** 受控小开关：class 契约与既有 .ui-switch 完全一致（on 表示开启）。 */
-export function Switch({ className, checked = false, onCheckedChange, disabled, onClick, ...props }:
+export function Switch({ className, checked = false, onCheckedChange, disabled, ...props }:
   Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onChange'> & { checked?: boolean; onCheckedChange?: (next: boolean) => void }) {
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (disabled) return
-    onClick?.(event)
-    if (!event.defaultPrevented) onCheckedChange?.(!checked)
-  }
-  return <button {...props} type="button" role="switch" aria-checked={checked} disabled={disabled}
-    className={cn('ui-switch', checked && 'on', className)} onClick={handleClick}>
+  return <button type="button" role="switch" aria-checked={checked} disabled={disabled}
+    className={cn('ui-switch', checked && 'on', className)}
+    onClick={event => { props.onClick?.(event); if (!event.defaultPrevented) onCheckedChange?.(!checked) }} {...props}>
     <span aria-hidden="true" />
   </button>
 }

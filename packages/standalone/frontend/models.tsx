@@ -107,12 +107,10 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
   }
 
   const cancel = () => {
-    const cancelled = operation
     pending.current?.abort()
     pending.current = undefined
     setOperation(undefined)
-    setTest(previous => previous?.state === 'pending' ? { ...previous, state: 'cancelled' } : previous)
-    setMessage(cancelled === 'probe' ? '已取消可用性探测' : cancelled === 'refresh' ? '已取消清单刷新' : '已取消模型测试')
+    setTest(previous => previous ? { ...previous, state: 'cancelled' } : previous)
   }
 
   const copyModelId = (model: Model) => {
@@ -145,10 +143,9 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
   const routable = summary.catalog.filter(model => model.routable).length
   return <div className="model-browser" data-testid="models-ready">
     <header className="dashboard-heading">
-      <div><h1>模型清单</h1>
+      <div><div className="heading-eyebrow">WORKSPACE / MODELS</div><h1>模型清单</h1>
         <p>{number(summary.catalog.length)} 个模型 · {number(routable)} 个可接入</p></div>
-      <div className="actions" aria-label="模型清单操作" aria-busy={!!operation}>
-        {operation && operation !== 'test' && <Button variant="outline" onClick={cancel}><Square size={14} />取消{operation === 'probe' ? '探测' : '刷新'}</Button>}
+      <div className="actions">
         <Button variant="outline" disabled={!!operation} onClick={() => { void run('refresh') }}>
           <RefreshCw size={15} className={operation === 'refresh' ? 'spinning' : ''} />{operation === 'refresh' ? '正在刷新' : '刷新清单'}
         </Button>
@@ -167,8 +164,6 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
     {error && <div className="channel-error" role="alert"><CircleAlert size={16} /><span>{error}</span>
       <Button variant="ghost" aria-label="关闭错误提示" title="关闭错误提示" onClick={() => setError('')}><X size={15} /></Button></div>}
     {message && <p className="model-feedback" role="status"><Check size={15} />{message}</p>}
-    <section className="model-view-controls" aria-label="当前列表筛选">
-      <div className="model-control-heading"><h2>查找模型</h2><p>筛选只影响当前列表。</p></div>
     <div className="model-filters">
       <div className="model-search"><Search size={16} /><Input type="search" aria-label="搜索模型" placeholder="搜索模型名称或 ID…"
         value={filters.search} onChange={event => changeFilters({ search: event.target.value })} /></div>
@@ -190,17 +185,12 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
       <span role="status" data-testid="model-result-count">{number(models.length)} / {number(summary.catalog.length)} 个模型</span>
       {filtered && <Button variant="ghost" onClick={() => changeFilters(initialFilters)}><X size={14} />清空筛选</Button>}
     </div>
-    </section>
-    <section className="model-publication-settings" aria-label="客户端模型展示" aria-busy={visibilitySaving}>
-      <div className="model-control-heading"><h2>客户端模型展示</h2><p>以下开关立即保存，会同步影响客户端和 API 模型清单；历史模型 ID 仍可调用。</p></div>
-      <div className="model-publication-actions">
+    <div className="model-list-toolbar">
       <label><input type="checkbox" role="switch" checked={summary.settings.hideFreeModels === true}
         disabled={visibilitySaving} onChange={event => { void saveVisibility({ hideFreeModels: event.target.checked }) }} /> {visibility.hideFree}</label>
       <label><input type="checkbox" role="switch" checked={summary.settings.hideEacModels === true}
         disabled={visibilitySaving} onChange={event => { void saveVisibility({ hideEacModels: event.target.checked }) }} /> {visibility.hideEac}</label>
-      {visibilitySaving && <span role="status" className="model-publication-state"><LoaderCircle size={14} className="spinning" />正在保存</span>}
-      </div>
-    </section>
+    </div>
     {test && <section className={`model-test-result model-test-${test.state}`} aria-label="模型测试结果" aria-live="polite">
       <div className="model-test-heading"><div><strong>
         {test.state === 'pending' ? '正在测试' : test.state === 'success' ? '测试完成' : test.state === 'cancelled' ? '测试已取消' : '测试失败'}
@@ -208,7 +198,7 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
         {test.state === 'pending' ? <Button variant="outline" onClick={cancel}><Square size={14} />取消测试</Button>
           : <Button variant="ghost" aria-label="关闭测试结果" title="关闭测试结果" onClick={() => setTest(undefined)}><X size={15} /></Button>}
       </div>
-      {test.state === 'success' && <pre>{test.result?.text || '请求已完成，上游没有返回可见正文。'}</pre>}
+      {test.state === 'success' && <><pre>{test.result?.text}</pre>{test.result?.persisted === false && <p role="status">测试已成功，但结果未能保存；请检查数据目录权限或重新测试。</p>}</>}
       {test.state === 'error' && <p>{test.error}</p>}
     </section>}
     {models.length ? <div className="model-table" role="table" aria-label="模型清单" aria-rowcount={models.length + 1} aria-colcount={5}>
@@ -224,7 +214,10 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
         <div className="model-virtual-content" style={{ height: virtual.getTotalSize() }}>
           {virtual.getVirtualItems().map(item => {
             const model = models[item.index]
-            const state = model.availability ?? 'unknown'
+            const state = model.availabilitySource === 'listing' ? 'listed' : model.availability ?? 'unknown'
+            const manual = model.availabilitySource === 'manual'
+            const failed = manual && state === 'unknown'
+            const availabilityName = failed ? '实测失败' : manual && state === 'available' ? '实测可用' : availabilityNames[state] ?? '未知状态'
             const disabledReason = !summary.settings.enabled ? '推理服务已暂停' : !model.routable && !model.hiddenByUser ? '模型尚未公开，请检查渠道账号或模型设置' : operation ? '请等待当前操作完成' : ''
             return <div role="row" aria-rowindex={item.index + 2} key={item.key} data-index={item.index} data-model-id={model.id}
               className="model-table-row" ref={virtual.measureElement} style={{ transform: `translateY(${item.start}px)` }}
@@ -236,8 +229,11 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
                 <Badge>{model.vision ? '视觉' : '纯文本'}</Badge>{model.reasoning && <Badge tone="blue">思考</Badge>}</div></div>
               <div role="cell" className="model-limits"><span title={model.contextWindow ? `${model.contextWindow} Token` : undefined}>{capacity(model.contextWindow)} <small>上下文</small></span>
                 <span title={model.maxOutput ? `${model.maxOutput} Token` : undefined}>{capacity(model.maxOutput)} <small>输出</small></span></div>
-              <div role="cell" className="model-state"><Badge tone={state === 'available' ? 'success' : ['unavailable', 'throttled', 'region-blocked'].includes(state) ? 'warning' : 'neutral'}>
-                {availabilityNames[state] ?? '未知状态'}</Badge>{!model.routable && <small>{model.hiddenByUser ? visibility.hidden : '未公开'}</small>}
+              <div role="cell" className="model-state"><Badge tone={state === 'available' ? 'success' : failed || ['unavailable', 'throttled', 'region-blocked'].includes(state) ? 'warning' : 'neutral'}>
+                {availabilityName}</Badge>
+                {manual && state !== 'available' && model.detail && <small title={model.detail}
+                  style={{ maxWidth: '100%', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{model.detail}</small>}
+                {!model.routable && <small>{model.hiddenByUser ? visibility.hidden : '未公开'}</small>}
                 {model.ttftMs != null && <small>首响应 {number(model.ttftMs)} ms</small>}</div>
               <div role="cell" className="model-row-actions">
                 {['anonymous', 'kilo', 'eac', 'aggregate', 'combo'].includes(model.channel) && <Button variant="ghost"

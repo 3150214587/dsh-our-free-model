@@ -41,7 +41,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { callRoute, chatFrames, fakeContext, freePort, stubUpstream, until } from './lib/fake-kernel.mjs'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
-const OUT_DIR = process.env.OFM_PREVIEW_OUTPUT ?? path.join(ROOT, '.verify', 'ui-preview')
+const OUT_DIR = path.join(ROOT, '.verify', 'ui-preview')
 const say = (...parts) => console.log('ui-preview:', ...parts)
 
 /** A big, obviously-compressible tool result: a real `git diff` shape. */
@@ -56,7 +56,7 @@ const BIG_DIFF = [
   '',
 ].join('\n')
 
-const TABS = ['free', 'eac', 'channels', 'aggregate', 'saver', 'routing', 'ledger', 'logs', 'gateway', 'upgrade', 'picks', 'sponsor']
+const TABS = ['free', 'eac', 'channels', 'aggregate', 'saver', 'routing', 'ledger', 'logs', 'gateway', 'upgrade', 'picks']
 
 // ── module resolution ────────────────────────────────────────────────────────
 /**
@@ -71,7 +71,6 @@ function moduleDirs() {
   const dirs = [
     process.env.OFM_PREVIEW_MODULES,
     path.join(ROOT, 'node_modules'),
-    path.join(ROOT, 'packages', 'standalone', 'node_modules'),
     path.join(ROOT, '..', 'node_modules'),
     path.join(ROOT, '..', '..', 'node_modules'),
   ].filter(value => typeof value === 'string' && value !== '')
@@ -455,7 +454,7 @@ const origin = `http://127.0.0.1:${previewPort}`
 say(`preview server on ${origin}`)
 
 // ── the browser ──────────────────────────────────────────────────────────────
-const playwright = process.env.OFM_PLAYWRIGHT_MODULE ? createRequire(import.meta.url)(process.env.OFM_PLAYWRIGHT_MODULE) : requireFrom(dirs, 'playwright')
+const playwright = requireFrom(dirs, 'playwright')
 if (playwright === null) {
   say('FAIL: playwright was not found in any of the directories above; cannot drive a browser.')
   server.close()
@@ -463,7 +462,6 @@ if (playwright === null) {
 }
 
 async function launch(pw) {
-  if (process.env.OFM_BROWSER_PATH) return pw.chromium.launch({ executablePath: process.env.OFM_BROWSER_PATH, headless: true })
   const wanted = process.env.OFM_PREVIEW_BROWSER
   const channels = wanted === undefined ? ['msedge', 'chrome'] : [wanted]
   const failures = []

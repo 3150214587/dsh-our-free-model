@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Activity, ArrowDownToLine, ArrowUpFromLine, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CircleAlert, Layers3, RefreshCw, Search, RotateCcw, X } from 'lucide-react'
+import { Activity, ArrowDownToLine, ArrowUpFromLine, ChevronLeft, ChevronRight, CircleAlert, Layers3, RefreshCw, Search, RotateCcw, X } from 'lucide-react'
 import { Badge, Button, Card, Input } from './components/ui'
 import { usageDays, usageModels } from './usage-data.mjs'
 import type { Host, Stats, UsageModel } from './types'
@@ -15,7 +15,6 @@ export function Usage({ stats, host, active }: { stats: Stats; host: Host; activ
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('calls')
   const [page, setPage] = useState(1)
-  const [chartDay, setChartDay] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -32,7 +31,6 @@ export function Usage({ stats, host, active }: { stats: Stats; host: Host; activ
     return () => { generation.current++ }
   }, [active])
   const days: { day: string; total: number }[] = usageDays(stats.days, period)
-  const currentChartDay = days.find(day => day.day === chartDay) ?? days[days.length - 1]
   const windowTotal = days.reduce((sum, day) => sum + day.total, 0)
   const max = Math.max(1, ...days.map(day => day.total))
   const models: { total: number; pages: number; page: number; rows: UsageModel[] } = usageModels(stats.models, { search, sort, page })
@@ -65,7 +63,7 @@ export function Usage({ stats, host, active }: { stats: Stats; host: Host; activ
   }
   if (!active) return null
   return <div className="usage-browser" data-testid="usage-ready">
-    <header className="dashboard-heading"><div>
+    <header className="dashboard-heading"><div><div className="heading-eyebrow">WORKSPACE / USAGE</div>
       <h1>用量统计</h1><p>查看本机累计用量与每日趋势。</p></div>
       <Button variant="outline" disabled={refreshing} onClick={() => { void refresh() }}>
         <RefreshCw size={15} className={refreshing ? 'spinning' : ''} />{refreshing ? '正在更新' : '更新统计'}
@@ -92,25 +90,15 @@ export function Usage({ stats, host, active }: { stats: Stats; host: Host; activ
           <button key={count} aria-pressed={period === count} onClick={() => setPeriod(count)}>{count} 天</button>)}</div>
       </div>
       <div className="usage-window-total"><strong data-testid="usage-window-total">{number(windowTotal)}</strong><span>Token / 所选时段</span></div>
-      <p className="usage-scroll-hint">左右滑动查看日期；键盘可用方向键切换，Home / End 跳到首尾。</p>
+      <p className="usage-scroll-hint">左右滑动查看完整日期。</p>
       <div className="usage-trend-scroll"><div className="usage-trend-chart" style={{ minWidth: period * 35 }}
-        role="group" aria-roledescription="条形图" aria-label={`最近 ${period} 天 Token 用量`}>
-        {days.map((day, index) => <button type="button" className={`usage-day ${chartDay && currentChartDay.day === day.day ? 'usage-day-selected' : ''}`} key={day.day}
-          tabIndex={day.day === currentChartDay.day ? 0 : -1}
-          title={`${day.day} · ${number(day.total)} Token`} aria-label={`${day.day}：${number(day.total)} Token`}
-          onFocus={() => setChartDay(day.day)} onClick={() => setChartDay(day.day)} onKeyDown={event => {
-            const target = event.key === 'ArrowLeft' ? Math.max(0, index - 1) : event.key === 'ArrowRight' ? Math.min(days.length - 1, index + 1)
-              : event.key === 'Home' ? 0 : event.key === 'End' ? days.length - 1 : -1
-            if (target < 0) return
-            event.preventDefault()
-            const bars = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('.usage-day')
-            bars?.[target]?.focus()
-          }}>
-          <span className="usage-day-track"><span className={`usage-day-bar ${day.total ? '' : 'zero'}`} style={{ height: `${Math.max(1, day.total / max * 100)}%` }} /></span>
+        role="img" aria-label={`最近 ${period} 天 Token 用量：${days.map(day => `${day.day} ${number(day.total)}`).join('；')}`}>
+        {days.map(day => <div className="usage-day" key={day.day} tabIndex={0} title={`${day.day} · ${number(day.total)} Token`}
+          aria-label={`${day.day}：${number(day.total)} Token`}>
+          <div className="usage-day-track"><div className={`usage-day-bar ${day.total ? '' : 'zero'}`} style={{ height: `${Math.max(1, day.total / max * 100)}%` }} /></div>
           <span>{day.day.slice(5).replace('-', '/')}</span>
-        </button>)}
+        </div>)}
       </div></div>
-      {chartDay && <p className="usage-chart-reading" role="status">{currentChartDay.day} · {number(currentChartDay.total)} Token</p>}
       {windowTotal === 0 && <p className="usage-window-empty" role="status">{hasHistory ? '所选时段没有已记录的 Token 用量，累计统计仍保留历史记录。' : '还没有调用记录，接入客户端后用量会显示在这里。'}</p>}
       <div className="card-foot"><span>{days[0].day} — {days[days.length - 1].day} · 本地自然日</span><span>未上报的用量不会自动估算为实际 Token</span></div>
     </Card>
@@ -140,14 +128,10 @@ export function Usage({ stats, host, active }: { stats: Stats; host: Host; activ
       </div></> : <div className="usage-empty"><Activity size={25} /><h3>{search.trim() ? '没有匹配的模型' : '还没有模型用量记录'}</h3>
         <p>{search.trim() ? '试试其他名称或 ID，或清空搜索。' : '接入客户端并发送消息后，模型统计会显示在这里。'}</p></div>}
       <div className="usage-pagination"><span data-testid="usage-model-count">{number(models.total)} / {number(stats.models.length)} 个模型</span>
-        <span>第 {models.page} / {models.pages} 页</span><div className="usage-page-controls" aria-label="统计模型分页">
-        <Button variant="outline" size="icon" aria-label="第一页统计模型" disabled={models.page === 1} onClick={() => setPage(1)}><ChevronsLeft size={15} /></Button>
-        <Button variant="outline" aria-label="上一页统计模型" disabled={models.page === 1}
+        <span>第 {models.page} / {models.pages} 页</span><Button variant="outline" aria-label="上一页统计模型" disabled={models.page === 1}
           onClick={() => setPage(models.page - 1)}><ChevronLeft size={15} />上一页</Button>
         <Button variant="outline" aria-label="下一页统计模型" disabled={models.page === models.pages}
-          onClick={() => setPage(models.page + 1)}>下一页<ChevronRight size={15} /></Button>
-        <Button variant="outline" size="icon" aria-label="最后一页统计模型" disabled={models.page === models.pages} onClick={() => setPage(models.pages)}><ChevronsRight size={15} /></Button>
-        </div></div>
+          onClick={() => setPage(models.page + 1)}>下一页<ChevronRight size={15} /></Button></div>
     </Card>
     <p className="footnote">统计只记录用量与性能，不保存提示词和回答。首字延迟与生成速度基于保留的可测量样本；未测得时显示“—”。</p>
   </div>

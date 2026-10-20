@@ -28,7 +28,7 @@ const css = shared.CSS + `
 }
 .ofm_root button,.ofm_root input,.ofm_root select{font-family:inherit}
 .ofm_root img{max-width:100%}
-.ofm_root input,.ofm_root select{max-width:100%;padding:7px 9px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--control-radius,6px);background:var(--surface,var(--dsw-alias-bg-layer-1));color:inherit}
+.ofm_root input,.ofm_root select{max-width:100%;padding:7px 9px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:white;color:inherit}
 .ofm_root input[type=checkbox]{padding:0}
 `
 

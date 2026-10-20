@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Activity, ArrowRight, ArrowUpRight, Boxes, Check, CircleCheck, Copy, Handshake, Layers3, Network, RefreshCw, Terminal, Zap } from 'lucide-react'
 import { Badge, Button, Card } from './ui'
-import { providers } from 'ofm-provider-list'
 import '../usage.css'
 import type { Host, Snapshot } from '../types'
 
@@ -31,7 +30,7 @@ export function Overview({ summary, stats, host }: Snapshot & { host: Host }) {
   const failures = [...stats.samples].reverse().filter(row => row.ok === false).slice(0, 4)
   const sources = [
     { name: '匿名与 Kilo', sub: '无需账号的免费模型', icon: Zap, count: summary.catalog.filter(row => row.channel === 'anonymous' || row.channel === 'kilo').length, page: 'models' as const },
-    { name: '免费账号渠道', sub: `${providers.length} 个供应商，独立账号池`, icon: Network, count: summary.catalog.filter(row => !['anonymous', 'kilo', 'eac'].includes(row.channel)).length, page: 'channels' as const },
+    { name: '免费账号渠道', sub: '13 个供应商，独立账号池', icon: Network, count: summary.catalog.filter(row => !['anonymous', 'kilo', 'eac'].includes(row.channel)).length, page: 'channels' as const },
     { name: 'EAC 协付渠道', sub: summary.eacAuth?.local ? '已保存本机授权' : '尚未保存本机授权', icon: Handshake, count: summary.catalog.filter(row => row.channel === 'eac').length, page: 'eac' as const },
   ]
 
@@ -44,7 +43,7 @@ export function Overview({ summary, stats, host }: Snapshot & { host: Host }) {
   }
 
   return <div className="dashboard" data-testid="overview-ready">
-    <header className="dashboard-heading"><div><h1>工作空间概览</h1><p>查看你的模型连接与运行情况。</p></div>
+    <header className="dashboard-heading"><div><div className="heading-eyebrow">WORKSPACE / OVERVIEW</div><h1>工作空间概览</h1><p>查看你的模型连接与运行情况。</p></div>
       <Button variant="outline" disabled={refreshing} onClick={() => {
         setRefreshing(true); void host.refresh().catch(host.error).finally(() => setRefreshing(false))
       }}><RefreshCw size={15} className={refreshing ? 'spinning' : ''} />{refreshing ? '正在更新' : '更新状态'}</Button></header>
@@ -100,16 +99,12 @@ export function Overview({ summary, stats, host }: Snapshot & { host: Host }) {
       <Card className="ov-failures">
         <div className="card-heading"><div><h2>运行检查</h2><p>服务与最近的失败请求</p></div>
           <Badge tone={failures.length ? 'warning' : 'success'}>{failures.length ? '有失败记录' : '暂无失败记录'}</Badge></div>
-        <div className={`runtime-check ${summary.channels.state === 'failed' ? 'runtime-check-error' : ''}`}><CircleCheck size={17} /><span>渠道模块</span><strong>{summary.channels.state === 'ready' ? '已就绪' : summary.channels.state === 'failed' ? '加载失败' : '初始化中'}</strong></div>
-        {summary.channels.state === 'failed' && <div className="runtime-error" role="alert"><p>{summary.channels.error || '渠道模块暂时不可用，请重新读取状态。'}</p><Button variant="outline" disabled={refreshing} onClick={() => {
-          setRefreshing(true); void host.refresh().catch(host.error).finally(() => setRefreshing(false))
-        }}>重新读取状态</Button></div>}
+        <div className="runtime-check"><CircleCheck size={17} /><span>渠道模块</span><strong>{summary.channels.state === 'ready' ? '已就绪' : summary.channels.state === 'failed' ? '加载失败' : '初始化中'}</strong></div>
         <div className="runtime-check"><RefreshCw size={17} /><span>模型自动刷新</span><strong>{summary.automaticRefresh ? `每 ${summary.settings.probeIntervalMinutes} 分钟` : '已暂停'}</strong></div>
         {failures.length ? <div className="failure-list ov-failure-list">{failures.map((row, index) =>
           <div key={`${row.at}-${index}`} className="ov-failure-row">
             <span>{row.model ?? '未知模型'}</span>
             <small>{row.at ? new Date(row.at).toLocaleTimeString('zh-CN') : '时间未知'} · 请求未完成</small>
-            <details className="failure-details"><summary>查看失败原因</summary><p>{row.error || '该条历史样本没有保留详细错误信息。'}</p></details>
           </div>)}</div>
           : <div className="runtime-empty ov-runtime-empty"><CircleCheck size={18} /><span>最近的请求样本中没有失败记录</span></div>}
         <div className="card-foot"><span title={summary.dataDir}>数据仅保存在本机独立目录</span><button onClick={() => host.navigate('settings')}>服务设置 <ArrowRight size={14} /></button></div>
