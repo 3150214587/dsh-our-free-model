@@ -5262,3 +5262,66 @@ input:disabled, select:disabled, textarea:disabled, .ui-input:disabled {
   margin-left: auto !important;
 }
 /* ==== 夜主题·工作空间卡片修复 END ==== */
+
+/* 手动低性能模式：仅 standalone 入口写入此标记，包含同文档的旧渠道 client。
+   #root 的优先级覆盖旧 client 的 !important；body 规则同时覆盖其弹层/通知。 */
+:root[data-ofm-low-performance="true"],
+:root[data-ofm-low-performance="true"] body,
+:root[data-ofm-low-performance="true"] body *,
+:root[data-ofm-low-performance="true"] body *::before,
+:root[data-ofm-low-performance="true"] body *::after,
+:root[data-ofm-low-performance="true"] #root *,
+:root[data-ofm-low-performance="true"] #root *::before,
+:root[data-ofm-low-performance="true"] #root *::after,
+:root[data-ofm-low-performance="true"] body::before,
+:root[data-ofm-low-performance="true"] body::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  filter: none !important;
+  animation: none !important;
+  transition: none !important;
+  will-change: auto !important;
+  scroll-behavior: auto !important;
+}
+
+:root[data-ofm-low-performance="true"]::view-transition-old(root),
+:root[data-ofm-low-performance="true"]::view-transition-new(root),
+:root[data-ofm-low-performance="true"]::view-transition-group(root) {
+  animation: none !important;
+  mix-blend-mode: normal !important;
+}
+
+/* 去掉极光与全屏装饰层；底下原有的明暗背景继续承担文字对比。 */
+:root[data-ofm-low-performance="true"] body::before,
+:root[data-ofm-low-performance="true"] body::after,
+:root[data-ofm-low-performance="true"] #root .ofm_aurora {
+  display: none !important;
+}
+:root[data-ofm-low-performance="true"] #root .topbar,
+:root[data-ofm-low-performance="true"] #root .ofm_glass,
+:root[data-ofm-low-performance="true"] #root .ofm_panel {
+  background: var(--dsw-alias-bg-layer-1) !important;
+}
+
+/* 借鉴 PR #481 的 reduced-motion 处理：静态加载条可见，不能停在画外。
+   保留控件旁原有的“正在连接 / 加载 / 保存”等状态文字，不伪装已完成。 */
+:root[data-ofm-low-performance="true"] #root .loading-bar-fill,
+:root[data-ofm-low-performance="true"] #root .ofm_prog i {
+  width: 100% !important;
+  opacity: .65 !important;
+  transform: none !important;
+}
+:root[data-ofm-low-performance="true"] #root .ofm_skel::after,
+:root[data-ofm-low-performance="true"] #root .ofm_prog i::after {
+  display: none !important;
+}
+:root[data-ofm-low-performance="true"] #root .ui-spinner {
+  border-style: dotted !important;
+  opacity: .75 !important;
+}
+
+/* 沿用原有字段、断点与焦点样式；此开关不受服务设置保存中的禁用状态影响。 */
+.settings-ui-preferences .settings-card-heading { flex-wrap: wrap; }
+.settings-ui-preferences .settings-card-heading > div { flex: 1 1 180px; min-width: 0; }
+.settings-ui-preferences .settings-field { gap: 16px; }
+.settings-ui-preferences .footnote { margin-top: 12px; }

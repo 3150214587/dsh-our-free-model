@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
 import { CircleAlert, Check, LoaderCircle, RotateCcw, Save, Settings2, RefreshCw } from 'lucide-react'
 import { Badge, Button, Card, Input } from './components/ui'
 import { settingsDraft, settingsChanged, syncSettings, validateSettingsDraft } from './settings-data.mjs'
 import { visibilityCopy } from './visibility-data.mjs'
 import type { Host, Summary } from './types'
+import { getUiPreferences } from './ui-preferences.mjs'
 import './settings.css'
+
+const uiPreferences = getUiPreferences()
 
 type Draft = ReturnType<typeof settingsDraft>
 type NumberField = 'defaultMaxTokens' | 'probeIntervalMinutes'
@@ -15,6 +18,7 @@ const connectionError = (reason: unknown) => reason instanceof Error
     : reason.message : '保存失败，修改已保留，请重试。'
 
 export function Settings({ summary, host, active }: { summary: Summary; host: Host; active: boolean }) {
+  const ui = useSyncExternalStore(uiPreferences.subscribe, uiPreferences.getSnapshot)
   const visibility = visibilityCopy(document.documentElement.lang)
   const [state, setState] = useState(() => ({ saved: summary.settings, draft: settingsDraft(summary.settings) }))
   const [saving, setSaving] = useState(false)
@@ -88,6 +92,20 @@ export function Settings({ summary, host, active }: { summary: Summary; host: Ho
       <h1>服务设置</h1><p>调整本机推理与模型刷新，保存后生效。</p></div>
       <Badge tone={summary.settings.enabled ? 'success' : 'warning'}>{summary.settings.enabled ? '推理服务已启用' : '推理服务已暂停'}</Badge>
     </header>
+    <fieldset className="settings-fieldset settings-ui-preferences" aria-labelledby="ui-preferences-title">
+      <Card className="settings-card">
+        <div className="settings-card-heading"><Settings2 size={16} /><div><h2 id="ui-preferences-title">界面性能</h2><p>仅影响当前浏览器或桌面窗口，切换后立即生效。</p></div></div>
+        <div className="settings-field">
+          <label htmlFor="setting-low-performance"><strong>低性能模式</strong><small id="setting-low-performance-help">关闭毛玻璃、模糊背景和装饰动效，保留明暗主题与加载提示。</small></label>
+          <input id="setting-low-performance" type="checkbox" role="switch" className="settings-toggle"
+            checked={ui.lowPerformance} aria-describedby="setting-low-performance-help setting-ui-preferences-status"
+            onChange={event => uiPreferences.setLowPerformance(event.target.checked)} />
+        </div>
+        <p id="setting-ui-preferences-status" className="footnote" role="status">{ui.storageAvailable
+          ? '已自动保存在当前浏览器，无需点击“保存设置”。'
+          : '浏览器存储不可用；本次打开仍可切换，关闭或刷新后可能无法保留。'}</p>
+      </Card>
+    </fieldset>
     <form onSubmit={event => { void submit(event) }} noValidate>
       <fieldset disabled={saving} className="settings-fieldset">
         <Card className="settings-card"><div className="settings-card-heading"><Settings2 size={16} /><div><h2>推理与模型</h2><p>控制客户端调用与模型展示。</p></div></div>

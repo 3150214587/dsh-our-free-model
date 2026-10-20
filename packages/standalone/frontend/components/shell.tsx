@@ -1,9 +1,10 @@
 import { Coffee, Activity, Boxes, Cable, ChevronRight, Handshake, LayoutDashboard, LogOut, Moon, Network, Settings2, ShieldCheck, Sun } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import brandMark from '../../../../icon.svg?inline'
 import { Badge, Button } from './ui'
 import type { Host, Page, Summary } from '../types'
+import { createThemeSwitcher, getUiPreferences } from '../ui-preferences.mjs'
 
 const navigation = [
   { label: '工作空间', items: [
@@ -24,34 +25,19 @@ type Origin = { x: number; y: number }
 
 function useTheme() {
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
-  const apply = (next: 'light' | 'dark') => {
-    document.documentElement.dataset.theme = next
-    try { localStorage.setItem('ofm-theme', next) } catch { /* 存储不可用时仅本次会话生效 */ }
-    setTheme(next)
-  }
-  const toggle = (origin?: Origin) => {
-    const next = theme === 'dark' ? 'light' : 'dark'
-    // 没有 View Transition、或用户要求减少动效时直接切换，不做扩散。
-    if (!origin || typeof document.startViewTransition !== 'function'
-      || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { apply(next); return }
-    const root = document.documentElement
-    // 半径取按钮中心到视口最远角的距离，保证圆盘一定盖满整屏。
-    const radius = Math.hypot(Math.max(origin.x, window.innerWidth - origin.x), Math.max(origin.y, window.innerHeight - origin.y))
-    root.style.setProperty('--theme-reveal-x', `${origin.x}px`)
-    root.style.setProperty('--theme-reveal-y', `${origin.y}px`)
-    root.style.setProperty('--theme-reveal-r', `${radius}px`)
-    // 扩散期间关掉 300ms 的底色过渡，否则"新主题"快照会抓到过渡中间色。
-    root.classList.add('theme-transitioning')
-    const transition = document.startViewTransition(() => { flushSync(() => apply(next)) })
-    const finish = () => {
-      root.classList.remove('theme-transitioning')
-      root.style.removeProperty('--theme-reveal-x')
-      root.style.removeProperty('--theme-reveal-y')
-      root.style.removeProperty('--theme-reveal-r')
-    }
-    transition.finished.then(finish, finish)
-  }
-  return { theme, toggle }
+  const switcher = useRef<ReturnType<typeof createThemeSwitcher> | null>(null)
+  useEffect(() => {
+    const current = createThemeSwitcher({ document, window, preferences: getUiPreferences(), commit: flushSync,
+      apply: next => {
+        document.documentElement.dataset.theme = next
+        try { localStorage.setItem('ofm-theme', next) } catch { /* 存储不可用时仅本次会话生效 */ }
+        setTheme(next)
+      },
+    })
+    switcher.current = current
+    return () => { current.dispose(); switcher.current = null }
+  }, [])
+  return { theme, toggle: (origin?: Origin) => switcher.current?.toggle(origin) }
 }
 
 export function ThemeToggle() {
