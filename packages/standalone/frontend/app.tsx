@@ -8,10 +8,6 @@ import { Connection } from './connection'
 import type { Host, Page, ServiceSettings, Snapshot } from './types'
 import './app.css'
 import { SponsorPage, SponsorNotice } from './sponsor'
-import { getUiPreferences } from './ui-preferences.mjs'
-
-// Initialize before the first loading/login render, including saved low-performance mode.
-getUiPreferences()
 
 const API = '/api/management'
 const pageNames: Page[] = ['overview', 'models', 'usage', 'channels', 'eac', 'settings', 'connection', 'sponsor']
