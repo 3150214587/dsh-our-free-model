@@ -37,4 +37,3 @@ export function jwtExpiresAtMs(token: string): number | undefined {
     return undefined
   }
 }
-
