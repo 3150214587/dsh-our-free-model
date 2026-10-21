@@ -202,9 +202,6 @@ export class CodeArtsAuth extends Service {
    * `window.location.href = loginUrl`，把**整个设置页**跳转到登录页
    * ——用户看到的正是「主页面直接跳转过去了」。
    *
-   * 与 CodeBuddy 系的做法对齐（那边是后端不 await、立即返回 loginUrl），
-   * 因此三者现在都是「点击 → 弹出小窗 → 轮询等待」的同一交互。
-   *
    * 调用方拿到 `loginUrl` 后应当**立即** `window.open`，再 await `result`。
    */
   async startLogin(
@@ -383,10 +380,6 @@ export class CodeArtsAuth extends Service {
 
   /**
    * 批量续期所有 codearts 账号。
-   *
-   * **包含已停用账号**（只按凭据是否具备续期材料过滤）：停用只应影响账号池的自动
-   * 选号，不该让凭据烂掉 —— 否则用户重新启用时只能重新登录。
-   * 详见 `BuddyAuth.refreshAll` 的注释（同一缺陷）。
    *
    * 单账号失败不影响其他账号，但**必须留日志**：CodeArts 是九个 provider 里
    * 唯一整份文件没有一处 `logger` 的（issue !IKIRTT 的可观测性条目），

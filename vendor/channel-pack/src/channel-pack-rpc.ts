@@ -17,7 +17,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { isRetiredProvider } from './retired-providers.js'
+import { isSupportedProvider } from './channel-pack-store.js'
 import { directFetch } from './direct-fetch.js'
 import { credentialRef, type CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { AccountPool } from './account-pool.js'
@@ -37,7 +37,7 @@ import type { QoderAuth } from './qoder-auth.js'
 import type { TraeAuth } from './trae-auth.js'
 import type { ClineAuth } from './cline-auth.js'
 import { LOOMY } from './loomy-product.js'
-import { buddyExpiringWindowDays } from './buddy-balance-rank.js'
+import { creditExpiringWindowDays } from './credit-expiry-window.js'
 import type { LoomyAuth } from './loomy-auth.js'
 import type { LoomyCredential } from './loomy.js'
 import { RACCOON } from './raccoon-product.js'
@@ -457,12 +457,6 @@ export function computeClaimSummary(outcomes: readonly ClaimOutcome[]): RpcCredi
  *
  * 抽出这一层是为了让「逐账号处理」能脱离 `ctx.connection.fetch` 注册流程
  * 单独单测：端点内不做任何业务判断，只负责取账号列表并转交下面的纯函数。
- *
- * **对凭据/产品类型做泛型化**（而非写死 Buddy 系类型）：LobsterAI 的协议
- * 完全不同（无签名、三步签到、身份字段是 keyfrom），但「逐账号顺序执行、
- * 单个失败不中断、凭据解析在 try 之内」这套编排逻辑是**通用**的。
- * 泛型化让 `collect*` 三兄弟只写一遍，两套协议各自注入自己的下钻函数。
- * 各渠道显式注入协议实现；不默认调用任何已退役渠道的端点。
  */
 export interface CreditsEndpointDeps<
   TCredential = unknown,
@@ -497,9 +491,6 @@ export interface CreditsEndpointDeps<
   warn?: (message: string) => void
   /**
    * 领取前是否先查一次签到状态（默认 `true`）。
-   *
-   * CodeBuddy 系拆成「查状态 + 领取」两个独立端点，先查可以省掉一次无效的
-   * 领取请求（活动未开 / 今天已领时直接短路）。
    *
    * LobsterAI 的领取流程**自身就是多步的**（slot → context → check_in），
    * `claimedToday` / `actions` 判断已在内部完成并会返回对应的
@@ -912,12 +903,6 @@ function registerChannelPackEndpoints(
   /**
    * Qoder **同协议族**成员：国际版与中国版共用同一组 RPC 实现，只换 `product`
    * 与 `auth` 实例。
-   *
-   * 为什么用注册表而不是给每个 provider 各加一条 `|| provider === X.id`：
-   * 本文件里 Qoder 相关分支有**四处**（登录 / 单账号续期 / 余额 / 领取）。
-   * 平行 case 的数量与「漏接一处」的概率同向增长 —— 本插件在 `workbuddy` 上
-   * 就真漏过一次（`account.refresh` 端点对它一直报 `Unknown provider`）。
-   * 注册表把「同族」这件事表达成数据结构，加第 N 个同族产品只改这一处。
    */
   interface QoderFamilyMember {
     readonly product: QoderProduct
@@ -982,7 +967,7 @@ function registerChannelPackEndpoints(
     store: createAutoCheckinStore(ctx),
     listProviderIds: async () => {
       const accounts = await pool.listAllAccounts()
-      return [...new Set(accounts.filter((entry) => !isRetiredProvider(entry.provider)).map((entry) => entry.provider))].sort()
+      return [...new Set(accounts.filter((entry) => isSupportedProvider(entry.provider)).map((entry) => entry.provider))].sort()
     },
     claim: (provider) =>
       handleMethod('credits.claimAll', { provider }) as Promise<BadgeRpcResult<RpcCreditsClaimAllResponse>>,
@@ -1289,8 +1274,8 @@ function registerChannelPackEndpoints(
     const request = payload !== null && typeof payload === 'object'
       ? payload as Record<string, unknown> : undefined
     const account = typeof request?.accountId === 'string' ? pool.findAccount(request.accountId) : undefined
-    if (isRetiredProvider(request?.provider) || isRetiredProvider(account?.provider)) {
-      return { ok: false, error: { code: 'provider-retired', message: 'WorkBuddy 国内版和国际版渠道已移除；历史账号凭据保持不变。' } }
+    if ((request?.provider !== undefined && !isSupportedProvider(request.provider)) || (account !== undefined && !isSupportedProvider(account.provider))) {
+      return { ok: false, error: { code: 'provider-unsupported', message: '不支持此渠道。' } }
     }
     // 每个 RPC 独立绑定传输与取消信号，避免使用最后挂载上下文的默认出口。
     // 合并上游自行设置的超时，既保留超时也响应客户端断开；后台调用可省略 signal。
@@ -1895,11 +1880,9 @@ function registerChannelPackEndpoints(
           // 按 **entry.provider** 分派到对应服务，并调用**按凭据 ref 的**
           // 续期入口 —— 三处都是修复既有缺陷的关键：
           //
-          // 1. 原实现只处理 codearts / buddy，`workbuddy` 会落到 else 抛
-          //    `Unknown provider` —— 即 `account.refresh` 端点**对 WorkBuddy 完全不可用**；
+
           // 2. 原实现调的是 `service.refresh()`，它读写的是该 provider 的
-          //    **默认单凭据 ref**（如 BUDDY_ACCESS_TOKEN），而要刷的是池内条目的
-          //    BUDDY_ACCOUNT_XXX —— 于是「刷这个账号」实际刷的是另一个凭据，
+
           //    结果要么报错要么静默改了错的对象。
           // 3. ⚠️ **每个分支都必须传 `pool` + `entry.id`**（issue !IKIRTT）：
           //    续期成功后要把新的 `expiresAt` 写回账号池，UI 才不再显示
@@ -2200,15 +2183,10 @@ function registerChannelPackEndpoints(
        * 只剩永久积分的账号在锁定期间等同于不可用（「锁定后没有临时积分后找
        * 可用账号就是没有可用账号」）。解锁后恢复「没临时积分就用永久积分」。
        *
-       * 三个 provider 都有这件事，但「什么算永久积分」不同（Loomy 看服务端的每日
-       * 池字段；两个 buddy 看资源包扣费截止距今是否满 15 天，判据见
-       * `buddy-balance-rank.ts`）。**语义相同、判据不同**，故共用一个端点与一张
-       * 持久化表，而不是各加一条 case —— 平行分支越多，漏接概率越高。
-       *
        * ⚠️ 开关是 **provider 级**（不分账号），持久化在
        * `$DSH_HOME/channel-pack/permanent-locks.json` 的 `locks` 表里（**不放 state.json**：
-        * 那份文档同机多 profile 共享，另一条工作区的旧版本整体重写它时不会带上
-        * 自己不认识的键 —— 理由见 `src/permanent-lock-store.ts` 文件头）
+       * 那份文档同机多 profile 共享，另一条工作区的旧版本整体重写它时不会带上
+       * 自己不认识的键 —— 理由见 `src/permanent-lock-store.ts` 文件头）
        * （`loomyPermanentLocked` 是同一值的兼容副本，见 `channel-pack-store.ts`）。
        *
        * ⚠️ `locked` 省略时**只读**（供面板初始化），给出布尔值才写入。
@@ -2418,7 +2396,7 @@ function registerChannelPackEndpoints(
         if (req.provider === 'codearts') {
           // CodeArts 没有独立的「签到状态」端点：可领状态要经
           // `statistics/plugin`（账户类型）+ `/v1/ops/delivery`（活动列表）
-          // 两步才能得到，且语义与 CodeBuddy 的 CheckinStatus 不同构
+
           //（无 streak_days / daily_credit 等概念）。
           // 故与 LobsterAI 同样如实返回 null，而不是臆造一份状态对象。
           const accounts = await pool.listAccounts(req.provider)
@@ -2431,7 +2409,7 @@ function registerChannelPackEndpoints(
         }
         if (req.provider === LOBSTERAI.id) {
           // LobsterAI 没有独立的「签到状态」端点：活动状态要经
-          // slot → context 两步才能得到，且语义与 CodeBuddy 的
+
           // CheckinStatus 不同构（无 streak/dailyCredit 等概念）。
           // 故这里如实返回 null，而不是臆造一份状态对象。
           const accounts = await pool.listAccounts(req.provider)
@@ -2456,7 +2434,7 @@ function registerChannelPackEndpoints(
         if (req.provider === CLINE.id) {
           // Cline **没有签到端点**（对整个 sidecar 二进制做字符串扫描，
           // checkin / check-in / daily / campaign 均无任何 Cline 业务端点命中；
-          // 见 src/cline-credits.ts 的模块注释）。故与 WorkBuddy 国际版一致，
+
           // 如实返回 null，而不是臆造一份状态对象。
           const accounts = await pool.listAccounts(req.provider)
           return {
@@ -2520,9 +2498,9 @@ function registerChannelPackEndpoints(
           return { ok: true, value: value satisfies RpcCreditsClaimAllResponse }
         }
         if (req.provider === 'codearts') {
-          // CodeArts（华为云）走**签名**协议，与两个腾讯系 provider 都不同源：
+
           // 领取流程自带「账户类型 + 活动列表」预检（见 claimCodeArtsDailyCheckin），
-          // 故 precheckStatus: false 跳过外部那次 CodeBuddy 式的状态查询 ——
+
           // 用 fetchCheckinStatus 打华为端点既发错请求又必然失败。
           const value = await collectClaimResults<CodeArtsCredential, undefined>(accounts, undefined, {
             resolve: (ref) => ctx.credentials.resolve(ref),
@@ -2767,12 +2745,12 @@ function registerChannelPackEndpoints(
           // ⚠️ LobsterAI 也回传窗口天数（用户报障「账号的积分没按长期、临时方式
           // 显示」）：它的每个资源包都带 `expiresAt`（已归一化到
           // `deductionEndTime`），面板要按到期远近分「长期 / 临时」。
-          // 窗口语义与 buddy / TRAE 一致，共用同一个环境变量。
+
           return {
             ok: true,
             value: {
               accounts: values,
-              windowDays: buddyExpiringWindowDays(),
+              windowDays: creditExpiringWindowDays(),
             } satisfies RpcCreditsBalancesResponse,
           }
         }
@@ -2884,14 +2862,14 @@ function registerChannelPackEndpoints(
           // ⚠️ TRAE 也回传窗口天数：它的资源包现在带 `deductionEndTime`
           // （条目级 `expire_time`，秒→毫秒），面板要按「长期 / 临时」分桶显示。
           // 没有窗口天数前端会拒绝渲染分类行（见 credit-expiry.js 的
-          // normalizeWindowDays —— 非 buddy provider 不带该字段被视为
+
           // "没有作废维度"，这是防止凭空渲染假分类行的门禁）。
-          // 窗口语义与 buddy 系一致：距到期不足 windowDays 的算「临时」。
+
           return {
             ok: true,
             value: {
               accounts: values,
-              windowDays: buddyExpiringWindowDays(),
+              windowDays: creditExpiringWindowDays(),
             } satisfies RpcCreditsBalancesResponse,
           }
         }
@@ -3519,7 +3497,7 @@ function registerChannelPackEndpoints(
         for (const provider of req.providers) {
           // 空 id 不进结果：它不可能对应任何 provider，留着只会让前端多一个
           // 无意义的键（前端按 PROVIDERS 取，多出来的键会被忽略，但脏数据不该产生）。
-          if (provider.length === 0 || isRetiredProvider(provider)) continue
+          if (provider.length === 0 || !isSupportedProvider(provider)) continue
           const catalog = modelAdapters?.[provider]?.listAllModels()
           const total = catalog?.length ?? 0
           // ⚠️ `listAllModels()` **不带 disabled 字段**，故必须另取黑名单再按 id 计数。
