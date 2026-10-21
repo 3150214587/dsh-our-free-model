@@ -89,8 +89,8 @@
     },
     {
       "path": "src/core/completion.js",
-      "size": 9524,
-      "sha256": "2e551e671cce92d988079b768aebd0f20db6636861fc4aceb26e96622c42808d"
+      "size": 9670,
+      "sha256": "b2ea4e3fe00e833b5609f60badac657297932de9fe82dd90565e082f153a4509"
     },
     {
       "path": "src/core/runtime.js",
@@ -174,8 +174,8 @@
     },
     {
       "path": "src/messages.js",
-      "size": 19034,
-      "sha256": "8c350c9905e8f69a9621efef5405a44b0a48ca28ead7b3f44a2703cad595ce76"
+      "size": 19185,
+      "sha256": "217fd90273824f135ed0b5417c8ea48089f5f78cdcf2cc6436008cb017997421"
     },
     {
       "path": "src/model-test.js",
