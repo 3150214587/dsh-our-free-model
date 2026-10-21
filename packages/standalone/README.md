@@ -1,7 +1,7 @@
 # Our Free Model 独立本地服务
 
 这是独立产品的源码入口，不需要 DSH、Cordis、DSH profile 或宿主凭据库。
-已提供独立 HTTP 服务、网页管理、EAC 和十一个账号渠道；独立安装制品尚未发布。
+已提供独立 HTTP 服务、网页管理、EAC 和十个账号渠道；独立安装制品尚未发布。
 本阶段从完整仓库运行，暂不能仅复制本目录或将它单独作为 npm 包安装。
 
 ## 启动
@@ -93,7 +93,7 @@ LAN Key 保存在当前独立目录的 `settings.json` 的 `standaloneLanKey` �
 - `POST /v1/responses`，包括流式与非流式请求
 - 匿名免费模型与 Kilo 免费模型
 - EAC 原 GitHub 授权、签名请求和资源池；独立应用使用自己的授权文件
-- CodeArts、LobsterAI、
+- LobsterAI、
   Qoder、Qoder 中国版、TRAE、Cline、Loomy、Raccoon、MiniMax Code、ZCode、Gemini
 - 原渠道登录、账号池和轮换、续期、模型开关、每日签到、积分锁定、账本及备份
 - 本地模型缓存、用量统计、周期刷新、请求取消与退出清理
