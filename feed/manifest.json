@@ -1,7 +1,7 @@
 {
   "version": "2.5.8",
   "base": "../",
-  "publishedAt": "2026-10-21T06:30:13.859Z",
+  "publishedAt": "2026-10-21T10:46:43.550Z",
   "notes": "",
   "files": [
     {
@@ -391,13 +391,13 @@
     },
     {
       "path": "vendor/channel-pack/NOTICE.md",
-      "size": 3542,
-      "sha256": "a6cad78e702a992511f24863350eef53bda78773c868d933f3dc44dbb5931ab9"
+      "size": 3486,
+      "sha256": "1b36cbbcea640af77a361c9633934372eb34ba2308e87b14f1fad8670b69e7e0"
     },
     {
       "path": "vendor/channel-pack/pack.js",
-      "size": 2761027,
-      "sha256": "3ccaaed171c545ee5046a0a611b7da24ae52533ab22670c2bbc293c3682faaa9"
+      "size": 2751315,
+      "sha256": "66f1044c38ba73db270a0cbde77f016f9957f19ec2f0763bbda05f745360c1ea"
     },
     {
       "path": "vendor/channel-pack/qoder-auth-wasm.wasm",
@@ -405,5 +405,5 @@
       "sha256": "6419471effa631519def7797d76d7ede38b9fcfa9a83c2148c8ef5d43355b43d"
     }
   ],
-  "signature": "1kjs8Xo+BAqdzz1S3xySsoVi2BCiZzDDTXFpxZ0iwaoeudSfN/hDmj083jJqdMcWzf2hSByS6z6F0eo6Vd3wBg=="
+  "signature": "8UmhHLdWlPtsD6iHG7OY2f4KSinNx/Vt0j+EpdxiNiqIsvKDbtNsX9tYS6G0uwvtk1cgWoohdm6qsc0bNus/Aw=="
 }
