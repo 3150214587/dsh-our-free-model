@@ -153,15 +153,6 @@ export const Config = Schema.object({
 /**
  * 注册 provider 配置 namespace（**仅老契约需要**）。
  *
- * - **≤0.1.6**：`ctx.settings` 允许插件注册任意 namespace，六个 provider 各占
- *   一个（`llm-buddy` / `llm-workbuddy` / ...）。注册缺失会让模型设置页在
- *   `refFor → deriveKeyRef(provider)` 处以
- *   `provider.toUpperCase is not a function` 崩溃，故注册后回读 `describe()` 自检。
- * - **0.1.7-rc.1**：settings 换成 `SettingsForms`，**没有 `register`**，命名
- *   空间只能是 profile 条目 id —— 此时不再（也无法）注册。这里刻意**静默跳过**：
- *   旧实现在这条分支上会打一条误导性的
- *   「settings 服务不可用」告警（启动日志实证）。
- *
  * ⚠️ **2026-10-01 起各 provider 不再声明为可配置 provider**（`settingsNamespaceFor`
  * 因此没有调用方），模型设置页不再有这些 namespace 的消费者 —— 这份注册此后只影响
  * ≤0.1.6 的老契约 profile，属遗留行为，本次未一并删除。
@@ -198,14 +189,6 @@ function registerProviderSettings(ctx: Context, ...namespaces: string[]): void {
 
 /**
  * 图片附件桥接：把持久化图片读成原始字节供适配器内联。
- *
- * 用 `ctx.get` 而非 `inject` —— 附件服务缺失时 provider 仍可正常加载，
-
- * 只是收到图片时报 UNSUPPORTED_CONTENT。三个 provider 共用本实现：
- * 两个 CodeBuddy 系产品（CodeBuddy / WorkBuddy）共用同一后端与协议；
- * LobsterAI 的图片形态同为 OpenAI 兼容的 `image_url` data URL
- * （2026-09-17 实测服务端接受并正确识别内容）。
-
  */
 export function makeReadImage(ctx: Context) {
   return async (attachment: unknown): Promise<{ data: Uint8Array; mediaType: string }> => {
@@ -280,7 +263,7 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
 
   // provider 配置命名空间的注册**只在老契约（≤0.1.6）下执行**：
   // 那时 `settings.register` 可用，十二个 namespace 分别对应 codearts 路由、
-  // CodeBuddy（buddy）、WorkBuddy（workbuddy）、LobsterAI（lobsterai）、
+
   // Qoder（qoder / qodercn）、TRAE（trae）、Cline（cline）、Loomy（loomy）、
   // Raccoon（raccoon）、MiniMax（minimax）与 Zcode（zcode）。
   //
@@ -328,7 +311,7 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
 
   // ⚠️ **CodeArts 不注册任何斜杠命令**（`codearts-login` / `codearts-status` /
   // `codearts-refresh` 三个已删除）：登录、状态与续期统一在 Channel Pack 设置页完成，
-  // 与 buddy / workbuddy / lobsterai / qoder / trae 的既有做法一致。
+
   const codearts = registerCodeArtsLlm(ctx, {
     fetchImpl: signedNetwork.fetch,
     credentialRef: credentialRef(CODEARTS_CREDENTIAL_REF),
@@ -361,31 +344,12 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
    *
    * ## 它修的是什么（真实缺陷，2026-10-03）
    *
-   * 用户报障：`/compact` 连续四次报
-   * 「Compaction could not produce a useful summary」，会话日志里 `compaction/end`
-   * 携带的真实错误却是 `buddy: no usable credential; log in from the Channel Pack
-   * panel first` —— 而当时 Channel Pack 里 buddy 账号**已登录、已启用**，只是它被
-   * `deepseek-v4.1-flash` 的模型级限流标记挡住（解禁时刻就在
-   * `modelRateLimits` 里）。
-   *
-   * 链路：唯一的启用账号被限流 → `pickBuddyCredential` 的候选筛成空集 →
-   * `select()` 只能回一个笼统的 `exhausted`（`reason` 在未锁定时被丢弃）→
-   * 退到单凭据 ref `BUDDY_ACCESS_TOKEN`，而 Channel Pack 登录只写
-   * `BUDDY_ACCOUNT_XXX`、该 ref **根本不存在** → 适配器抛 `MISSING_CREDENTIAL`。
-   *
    * 即：**凭据问题被误报成「没登录」，而真实原因是限流**。用户据此去重新
    * 登录，方向完全错。这与本仓库已记录的同类病根一致 —— 用默认归类代替了
    * 对业务语义的判断（qoder 的 `110` 被误归 `SERVER`、`10605` 排队被漏判）。
    *
    * ⚠️ 这里**只改错误语义，不改可用性**：没有账号可用就是没有，压缩该失败
    * 仍然失败；修的是「用户看到的原因」。绝不静默换模型、也绝不绕过限流标记。
-   *
-   * @param product - 目标 provider（用其 `id` 与 `displayName`）。**只要求这两个字段**：
-   *   除 buddy / workbuddy 外，cline 也接这条（它同样会因模型级限流被挡住，
-   *   而 `ClineProduct` 与 `BuddyProduct` 是两个类型）。
-   * @param modelId - 本次请求的模型；空串时不做判定（与选号侧约定一致）。
-   * @throws LlmError 带 `QUOTA_EXCEEDED` 码与解禁时刻，仅当**所有**启用账号
-   *   都在该模型上受限时；其余情形静默返回，交给原有的 `MISSING_CREDENTIAL`。
    */
   const throwIfAllAccountsRateLimited = (
     product: { id: string; displayName: string },
@@ -407,7 +371,7 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
   }
 
   // ===== LobsterAI (有道龙虾) 服务 =====
-  // 第三个产品线，但协议与腾讯系**完全不同**：不走 external-link 轮询登录，
+
   // 而是本地回调 + authCode 换 token（见 src/lobsterai-oauth.ts）。
   // 服务名由 LobsteraiAuth 依 product.id 派生，注册为 ctx.lobsteraiAuth。
   // 与其他 provider 一样不注册斜杠命令：入口在 Channel Pack 的 LobsterAI 面板。
@@ -416,10 +380,9 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
     credentialRef: credentialRef(LOBSTERAI.defaultCredentialRef),
     resolveCredential: async (modelId?: string) => {
       // 只从 LobsterAI 自己的账号池取账号，回退到自己的单凭据 ref，
-      // 保证不会串用 CodeBuddy / WorkBuddy / CodeArts 的凭据。
+
       // provider 实参用 LOBSTERAI.id 而非字面量 'lobsterai'：写死字面量在
-      // 改名/多产品场景下会静默查不到账号（本插件在 workbuddy 上踩过同类坑）。
-      // ⚠️ `modelId` 透传：否则模型级限流标记被忽略（详见 buddy 处说明）。
+
       const available = await pool.getAvailableAccount(LOBSTERAI.id, modelId ?? '')
       // Token 账本（第 2 期）：回报「本笔请求解析出的账号」。
       if (available) {
@@ -489,7 +452,7 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
       // 只从 Qoder 自己的账号池取账号，回退到自己的单凭据 ref，
       // 保证不会串用其它 provider 的凭据。
       // provider 实参用 QODER.id 而非字面量 'qoder'：写死字面量在
-      // 改名/多产品场景下会静默查不到账号（本插件在 workbuddy 上踩过同类坑）。
+
       // ⚠️ `modelId` 透传：Qoder 的额度是「模型 + 账号」维度（见
       // `qoder-adapter.ts` 的 `switchAccountOnQuota`），传空串会让它刚写下的
       // 当日额度标记在下次选号时被忽略。
@@ -551,7 +514,7 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
     resolveCredential: async (modelId?: string) => {
       // 只取中国版自己账号池的账号，回退到 QODERCN_ACCESS_TOKEN。
       // ⚠️ provider 实参必须是 QODER_CN.id：写死 'qoder' 会让中国版
-      // 永远查不到自己的账号（本插件在 workbuddy 上踩过同类坑）。
+
       // ⚠️ `modelId` 透传：与 QODER.id 同因（当日额度是「模型 + 账号」维度）。
       const available = await pool.getAvailableAccount(QODER_CN.id, modelId ?? '')
       if (available) {
@@ -659,15 +622,14 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
       // 只从 Cline 自己的账号池取账号，回退到自己的单凭据 ref，
       // 保证不会串用其它 provider 的凭据。
       // provider 实参用 CLINE.id 而非字面量 'cline'：写死字面量在
-      // 改名/多产品场景下会静默查不到账号（本插件在 workbuddy 上踩过同类坑）。
-      // ⚠️ `modelId` 透传：否则模型级限流标记被忽略（详见 buddy 处说明）。
+
       const available = await pool.getAvailableAccount(CLINE.id, modelId ?? '')
       // 记录实际选中的池账号（空串 = 回退到单凭据 ref 模式，见适配器注释）。
       activeClineAccountId = available?.entry.id ?? ''
       // Token 账本（第 2 期）：回报「本笔请求解析出的账号」（空串不回报）。
       if (activeClineAccountId.length > 0) reportLedgerAccount(CLINE.id, activeClineAccountId)
       if (available) return available.credential as ClineCredential
-      // ⚠️ 与 buddy / workbuddy 同因（真实缺陷，2026-10-03 用户报障）：
+
       // 唯一的 cline 账号被**模型级限流**标记挡住时，候选会筛成空集，最终降级成
       // `cline: no usable credential; log in first` —— 凭据明明在、账号也登录着，
       // 用户却被指去重新登录，方向完全错。故必须在退到单凭据 ref **之前**
@@ -760,7 +722,7 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
       // 只从 Loomy 自己的账号池取账号，回退到自己的单凭据 ref，
       // 保证不会串用其它 provider 的凭据。
       // provider 实参用 LOOMY.id 而非字面量 'loomy'：写死字面量在
-      // 改名/多产品场景下会静默查不到账号（本插件在 workbuddy 上踩过同类坑）。
+
       //
       // ⚠️ 先按「模型未受限 + 未停用」筛出候选，**再**按余额分档选号。
       // 余额排序只在这批候选内部进行 —— 即你的要求：
@@ -779,7 +741,7 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
         .map(a => ({ id: a.id, credentialRef: a.credentialRef }))
 
       // 「锁定永久积分」：只允许消耗今日赠送额度（用户要求，且持久化）。
-      // 开关按 provider 存（CodeBuddy / WorkBuddy 各有一份，互不影响）。
+
       const allowPermanent = !pool.permanentLocked(LOOMY.id)
 
       if (candidates.length > 0) {
@@ -893,10 +855,9 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
       // 只从 raccoon 自己的账号池取账号，回退到自己的单凭据 ref，
       // 保证不会串用其它 provider 的凭据。
       // provider 实参用 RACCOON.id 而非字面量：写死字面量在改名/多产品场景下
-      // 会静默查不到账号（本插件在 workbuddy 上踩过同类坑）。
-      // ⚠️ `modelId` 透传：否则模型级限流标记被忽略（详见 buddy 处说明）。
+
       const available = await pool.getAvailableAccount(RACCOON.id, modelId ?? '')
-      // `getAvailableAccount` 的凭据类型是 `CodeArtsCredential | BuddyCredential`
+      // `getAvailableAccount` 的凭据类型是 `CodeArtsCredential | StoredTokenCredential`
       // 联合（历史遗留），与 `RaccoonCredential` 无充分重叠，故经 `unknown` 转换。
       // 运行时安全性由 provider 过滤保证：查询用 `RACCOON.id`，取到的必是 raccoon 凭据。
       if (available) {
@@ -960,11 +921,11 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
     credentialRef: credentialRef(MINIMAX.defaultCredentialRef),
     resolveCredential: async (modelId?: string) => {
       // provider 实参用 MINIMAX.id 而非字面量：写死字面量在改名/多产品场景下
-      // 会静默查不到账号（本插件在 workbuddy 上踩过同类坑）。
+
       // ⚠️ 只从 minimax 自己的账号池取账号，回退到自己的单凭据 ref，
       // 保证不会串用其它 provider 的凭据。
       const available = await pool.getAvailableAccount(MINIMAX.id, modelId ?? '')
-      // `getAvailableAccount` 的凭据类型是 `CodeArtsCredential | BuddyCredential`
+      // `getAvailableAccount` 的凭据类型是 `CodeArtsCredential | StoredTokenCredential`
       // 联合（历史遗留），与 `MinimaxCredential` 无充分重叠，故经 `unknown` 转换。
       // 运行时安全性由 provider 过滤保证：查询用 `MINIMAX.id`，取到的必是 minimax 凭据。
       if (available) {
@@ -1114,7 +1075,6 @@ export function apply(ctx: Context, config: { disableOpencode?: boolean; outlet?
     ...ctx.logger === undefined ? {} : { logger: ctx.logger },
   })
 
-  // 一次性修复**老账号**的昵称与凭据字段（与上面 WorkBuddy 的启动清理同类）。
   //
   // 早期实现把服务端的 `name` 直接当昵称用，而实测它是**自动生成的默认名**
   //（本机账号是 `RaccoonAva`），注册第二个账号时会重名、无法区分；
@@ -1220,8 +1180,7 @@ const zcodeAdapter = registerZcodeLlm(ctx, {
     // 只从 zcode 自己的账号池取账号，回退到自己的单凭据 ref，
     // 保证不会串用其它 provider 的凭据。
     // provider 实参用 ZCODE.id 而非字面量：写死字面量在改名/多产品场景下
-    // 会静默查不到账号（本插件在 workbuddy 上踩过同类坑）。
-    // ⚠ `modelId` 透传：否则模型级限流标记被忽略（详见 buddy 处说明）。
+
     const available = await pool.getAvailableAccount(ZCODE.id, modelId ?? '')
     /**
      * `getAvailableAccount` 的凭据类型是历史遗留的联合类型，

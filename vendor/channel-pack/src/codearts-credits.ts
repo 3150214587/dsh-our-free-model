@@ -3,12 +3,6 @@
  *
  * ## 为什么与另外两个积分实现都不共用协议
  *
- * | provider    | 认证方式                    | 签到流程                          |
- * |-------------|-----------------------------|-----------------------------------|
- * | `buddy`     | Bearer + 腾讯系归属头        | 两步（状态 + 领取）                |
- * | `lobsterai` | 纯 Bearer，无签名            | 三步（slot + context + check_in）  |
- * | `codearts`  | **SDK-HMAC-SHA256 签名**     | **三步（账户类型 + 活动 + 领取+确认）** |
- *
  * 华为云这套与前两者没有一处共用，故独立成文件；但**复用 `credits.ts` 的
  * `ClaimOutcome` / `CreditBalance` / `CreditPackage` 类型**，使
  * `computeClaimSummary` 与 Channel Pack 的结果摘要 UI、`CreditBalanceRow`
@@ -53,12 +47,6 @@
  * 直接尝试领取只会拿到一个语义模糊的错误。
  *
  * ## 幂等
- *
- * 与 CodeBuddy 靠服务端业务码、LobsterAI 靠客户端 `idempotencyKey` 都不同：
- * 这里靠**活动列表的 `claimable` / `status`** 预检。IDE 的实现同样如此
- * （按钮在 `status` 属于已领取态时被 `disabled`）。领取后若服务端要求
- * 确认（响应 `id !== null`），再补一次 `confirm` —— 这一步是 IDE 的行为，
- * 漏掉会让积分停在「待确认」而不入账。
  */
 
 import { directFetch } from './direct-fetch.js'
@@ -414,7 +402,7 @@ function parseCreditBalance(metrics: unknown): CreditBalance | undefined {
       remaining: remain,
       total: amount,
       used,
-      // `statistics/plugin` 不下发资源包的有效性/周期字段（那是腾讯侧的形态）。
+
       // 这里如实置为有效、周期留空，而不是臆造一个到期时间。
       active: true,
       cycleStartTime: '',
@@ -639,7 +627,7 @@ export async function claimCodeArtsDailyCheckin(
   return {
     kind: 'claimed',
     credit: claimCredit > 0 ? claimCredit : activity.amount,
-    // CodeArts 的活动不下发连续签到天数概念（那是 CodeBuddy 的机制）。
+
     streakDays: 0,
     isStreakDay: false,
   }
