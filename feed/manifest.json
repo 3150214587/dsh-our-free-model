@@ -1,8 +1,8 @@
 {
-  "version": "2.5.8",
+  "version": "2.5.9",
   "base": "../",
   "publishedAt": "2026-10-21T15:45:42.729Z",
-  "notes": "",
+  "notes": "精简账号渠道至 10 个，清理遗留实现、依赖与桌面端资源，保留历史存储和备份兼容；同步交流群 5 的二维码与群号。",
   "files": [
     {
       "path": "adapter/dsh-llm.d.ts",
@@ -404,6 +404,5 @@
       "size": 298606,
       "sha256": "6419471effa631519def7797d76d7ede38b9fcfa9a83c2148c8ef5d43355b43d"
     }
-  ],
-  "signature": "a6xhjT7PIB5gK8TPXj69/pr9fScA/ZFZYozUL/naUvIijjmTXR+/INnr99YANxO9u5IkbCtnbZ2O0cD02qN+Ag=="
+  ]
 }
