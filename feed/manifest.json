@@ -1,7 +1,7 @@
 {
   "version": "2.5.9",
   "base": "../",
-  "publishedAt": "2026-10-22T03:17:16.478Z",
+  "publishedAt": "2026-10-22T03:36:10.088Z",
   "notes": "精简账号渠道至 10 个，清理遗留实现、依赖与桌面端资源，保留历史存储和备份兼容；同步交流群 5 的二维码与群号。",
   "files": [
     {
@@ -16,8 +16,8 @@
     },
     {
       "path": "client.js",
-      "size": 507839,
-      "sha256": "71f19d86788983fce20c4f066809976c22ce4d40bd7e57cf1d02373dd3dde7f9"
+      "size": 508469,
+      "sha256": "5c71baca0a655d5b71cba1529725d5d44acec93c0ee440f3af31ad74b02f5ca2"
     },
     {
       "path": "cordis.patch.yml",
@@ -405,5 +405,5 @@
       "sha256": "6419471effa631519def7797d76d7ede38b9fcfa9a83c2148c8ef5d43355b43d"
     }
   ],
-  "signature": "Ip7dUoTLQFFJk6UWJ6Slpxm5KwomfzImdIwl1kLGPUTymZUagFH/J5F/iRLWouK+v9kmxX4dLKGoZS0BczfmDg=="
+  "signature": "2jLmGobPUDs+Jm07SXYGLcjUezjNHTTPRs8Yg66XUzyOQeltI6c22bYmUj+lsMoIOzt+1yvjvg/DlvPnitQ/DQ=="
 }
