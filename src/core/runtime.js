@@ -78,6 +78,7 @@ export function createModelRuntime({
   let gatewayLatency = { ms: 0, at: 0 }
   let disposed = false
   const lifetime = new AbortController()
+  let egressGeneration = 0
 
   /**
    * Rebuild the merged catalog from its parts, in precedence order.
@@ -253,9 +254,11 @@ export function createModelRuntime({
   }
 
   let probeRound = null
+  let probeRoundGeneration = 0
   let probeThrottleStreak = 0
   let probeBackoffUntil = 0
   async function runProbeRound() {
+    const generation = egressGeneration
     // The absorbed channels get no per-model probes: their verdicts would be
     // spent against a different gateway than the one that serves them, and a
     // roster the listing named is advertised as-is (its health is the listing
@@ -267,7 +270,7 @@ export function createModelRuntime({
     // lane as a model name, spending quota to collect a verdict about nothing.
     const probeable = catalog.filter(entry => !isEacEntry(entry) && !isKiloEntry(entry) && !isAggregateEntry(entry) && !isComboEntry(entry))
     const results = await probeCatalog(probeable, { attributionUserAgent, signal: lifetime.signal }, (id, result) => {
-      if (disposed) return
+      if (disposed || generation !== egressGeneration) return
       availability.edit(value => ({
         ...value,
         results: {
@@ -281,7 +284,7 @@ export function createModelRuntime({
         },
       }))
     }, 2)
-    if (disposed) return {}
+    if (disposed || generation !== egressGeneration) return {}
     availability.update({ at: Date.now(), egress })
     availability.flush()
     const verdicts = Object.values(results)
@@ -301,7 +304,8 @@ export function createModelRuntime({
   }
   async function refreshAvailability(force = false) {
     if (disposed || (!force && probeBackoffUntil > Date.now())) return {}
-    if (probeRound !== null) return probeRound
+    if (probeRound !== null && probeRoundGeneration === egressGeneration) return probeRound
+    probeRoundGeneration = egressGeneration
     const round = runProbeRound()
     probeRound = round
     try { return await round } finally { if (probeRound === round) probeRound = null }
@@ -316,12 +320,19 @@ export function createModelRuntime({
       || previous.ip !== seen.ip || (seen.country !== undefined && previous.country !== seen.country)
     egress = seen
     if (changed) {
-      availability.update({ egress: seen })
+      egressGeneration++
+      // 保留历史记录，但旧出口的成功、拒绝和手动测量均不能代表新出口。
+      const expire = rows => Object.fromEntries(Object.entries(rows ?? {}).map(([id, row]) => [id, { ...row, stale: true }]))
+      availability.edit(value => ({
+        ...value, egress: seen, at: 0,
+        results: expire(value.results), manualResults: expire(value.manualResults),
+      }))
       availability.flush()
-      // Automatic probing is disabled by owner policy: an egress change is only
-      // recorded. The last measured verdicts stay in place until the user
-      // explicitly re-probes.
-      logger.info?.(`our-free-model: egress changed to ${seen.ip}${seen.country ? ` (${seen.country})` : ''}; availability left unchanged`)
+      probeThrottleStreak = 0
+      probeBackoffUntil = 0
+      emitTopology()
+      // 只使旧判定失效并通知选择器，不发送任何自动探测请求。
+      logger.info?.(`our-free-model: egress changed to ${seen.ip}${seen.country ? ` (${seen.country})` : ''}; previous availability marked stale`)
     }
     return true
   }
@@ -334,10 +345,11 @@ export function createModelRuntime({
     if (!entry) throw new UpstreamError('Unknown model "' + id + '"', CODE.client, { status: 404 })
     const token = {}
     latestTests.set(id, token)
+    const generation = egressGeneration
     const selectedEffort = effort === undefined || effort === '' ? DEFAULT_LEVEL : effort
     const linkedSignal = signal ? AbortSignal.any([signal, lifetime.signal]) : lifetime.signal
     const persist = row => {
-      if (disposed || linkedSignal.aborted || latestTests.get(id) !== token) return false
+      if (disposed || linkedSignal.aborted || latestTests.get(id) !== token || generation !== egressGeneration) return false
       availability.edit(value => ({ ...value, manualResults: { ...value.manualResults, [id]: row } }))
       availability.flush()
       emitTopology()
@@ -351,6 +363,7 @@ export function createModelRuntime({
         signal: testSignal,
       }, entry, state()), { signal: linkedSignal })
       if (linkedSignal.aborted || disposed) throw new UpstreamError('Text test cancelled', CODE.aborted)
+      if (generation !== egressGeneration) throw new UpstreamError('Network egress changed during the text test; please test again', CODE.aborted)
       const persisted = persist({ state: STATE.available, source: 'manual', at: Date.now(), ttftMs: measured.ttftMs, latencyMs: measured.totalMs })
       return { model: entry.id, effort: selectedEffort, ok: true, ...measured, persisted }
     } catch (error) {
